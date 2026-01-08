@@ -1,53 +1,88 @@
-# Mckay's App Template
+# Black Glass Project Management Dashboard
 
-This is a full-stack app template that I use to build my own apps.
+A modern, responsive project management dashboard for managing Black Glass use cases across multiple clients.
 
-To learn how to use this template with the best AI tools & workflows, check out my workshops on [Takeoff](https://JoinTakeoff.com/)!
+## Features
 
-## Tech Stack
-
-- Frontend: [Next.js](https://nextjs.org/docs), [Tailwind](https://tailwindcss.com/docs/guides/nextjs), [Shadcn](https://ui.shadcn.com/docs/installation), [Framer Motion](https://www.framer.com/motion/introduction/)
-- Backend: [PostgreSQL](https://www.postgresql.org/about/), [Supabase](https://supabase.com/), [Drizzle](https://orm.drizzle.team/docs/get-started-postgresql), [Server Actions](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations)
-- Auth: [Clerk](https://clerk.com/)
-- Payments: [Stripe](https://stripe.com/)
-
-## Prerequisites
-
-You will need accounts for the following services.
-
-They all have free plans that you can use to get started.
-
-- Create a [GitHub](https://github.com/) account
-- Create a [Supabase](https://supabase.com/) account
-- Create a [Clerk](https://clerk.com/) account
-- Create a [Stripe](https://stripe.com/) account
-- Create a [Vercel](https://vercel.com/) account
-
-You will likely not need paid plans unless you are building a business.
-
-## Environment Variables
-
-```bash
-# DB
-DATABASE_URL=
-# Access Supabase Studio here: http://127.0.0.1:54323/project/default
-
-# Clerk
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
-CLERK_SECRET_KEY=
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/login # do not change
-NEXT_PUBLIC_CLERK_SIGN_UP_URL=/signup # do not change
-
-# Stripe
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
-NEXT_PUBLIC_STRIPE_PAYMENT_LINK_YEARLY=
-NEXT_PUBLIC_STRIPE_PAYMENT_LINK_MONTHLY=
-```
+- **Client Management**: Add, edit, and manage clients
+- **Use Case Management**: Track use cases with complexity, gap, and effort estimation
+- **Developer Repository**: Manage developers and their capacity
+- **Timeline View**: Visualize use cases over time
+- **Gantt Chart**: Interactive Gantt chart visualization
+- **Developer Planning**: Plan projects based on developer capacity with conflict detection
+- **Multiple Views**: Client, Use Case, Priority, and Start Date views
+- **Password Protection**: Simple password-based authentication
 
 ## Setup
 
-1. Clone the repository
-2. Copy `.env.example` to `.env.local` and fill in the environment variables from above
-3. Run `npm install` to install dependencies
-4. Run `npm run dev` to run the app locally
+1. **Install Dependencies**
+   ```bash
+   npm install
+   ```
+
+2. **Environment Variables**
+   Create a `.env.local` file in the root directory:
+   ```
+   DASHBOARD_PASSWORD=your-secure-password-here
+   ```
+
+3. **Run Development Server**
+   ```bash
+   npm run dev
+   ```
+
+4. **Access Dashboard**
+   Navigate to `http://localhost:3000` - you'll be redirected to the dashboard and prompted for the password.
+
+## Data Storage
+
+All data is stored in `data/planning-data.json` as JSON files. The application will automatically seed initial data from `BG_PLAN_SUMMARY.md` on first run.
+
+## Project Structure
+
+```
+app/
+  dashboard/
+    _components/     # Dashboard components
+    layout.tsx       # Dashboard layout with password protection
+    page.tsx         # Main dashboard page
+lib/
+  storage.ts         # File-based storage utilities
+  seed-data.ts       # Data seeding from markdown
+  effort-formula.ts  # Effort estimation formulas
+types/
+  planning-types.ts  # TypeScript type definitions
+data/
+  planning-data.json # Main data file (auto-created)
+```
+
+## Key Features
+
+### Effort Estimation
+Man-days are calculated using the formula: `manDays = base + (gap * multiplier)`
+- Low Complexity: `10 + (gap * 1.5)`
+- Medium Complexity: `17.5 + (gap * 2.0)`
+- High Complexity: `27.5 + (gap * 2.5)`
+
+### Capacity Conflict Detection
+The developer planning view automatically detects when developers are assigned to multiple use cases with overlapping time periods and highlights conflicts.
+
+### View Modes
+- **Client View**: Grouped by client with expandable sections
+- **Use Case View**: Flat list sorted alphabetically
+- **Priority View**: Sorted by priority
+- **Start Date View**: Sorted by start date
+
+## Technologies
+
+- Next.js 15
+- React 19
+- TypeScript
+- Tailwind CSS
+- Framer Motion
+- Radix UI
+- Shadcn UI
+
+## License
+
+Private project
