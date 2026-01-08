@@ -10,7 +10,9 @@ export interface UseCaseTimeline {
   startDate: Date
   endDate: Date
   duration: number // in working days - dynamically calculated considering developer allocation and concurrency
-  effectiveCapacity: number // total effective developer capacity
+  calendarDays: number // total calendar days (including weekends)
+  effectiveCapacity: number // effective man-days per working day
+  manDays: number // raw effort from use case (for reference)
 }
 
 export interface TimelineResult {
@@ -223,10 +225,7 @@ function calculateUseCaseTimelineWithSegments(
     if (effectiveManDaysPerDay > 0) {
       const daysNeeded = remainingWork / effectiveManDaysPerDay
       const extendedEndDate = addWorkingDays(extensionStart, Math.ceil(daysNeeded))
-      
-      // Create a new segment for the extended period with recalculated capacity
-      const extendedWorkingDays = getWorkingDaysBetween(extensionStart, extendedEndDate)
-      
+
       segments.push({
         startDate: new Date(extensionStart),
         endDate: extendedEndDate,
@@ -411,7 +410,12 @@ export function calculateTimelines(
     // Calculate duration in working days
     const duration = getWorkingDaysBetween(period.startDate, period.endDate)
 
-    // Calculate effective capacity for final timeline
+    // Calculate calendar days (total days including weekends)
+    const calendarDays = Math.ceil(
+      (period.endDate.getTime() - period.startDate.getTime()) / (1000 * 60 * 60 * 24)
+    ) + 1 // +1 to include both start and end days
+
+    // Calculate effective capacity for final timeline (in man-days per working day)
     const concurrentUseCases = useCasePeriods.filter((other) => {
       if (other.useCase.id === period.useCase.id) return false
       return (
@@ -419,7 +423,7 @@ export function calculateTimelines(
       )
     })
 
-    let totalEffectiveCapacity = 0
+    let totalEffectiveHoursPerDay = 0
     for (const devId of period.assignedDeveloperIds) {
       const developer = data.developers.find((d) => d.id === devId)
       if (!developer) continue
@@ -430,17 +434,24 @@ export function calculateTimelines(
           uc.assignedDeveloperIds.includes(devId)
         ).length
 
+      // Developer capacity is hours per week, divide by 5 to get hours per day
       const dailyCapacity = developer.capacity / 5
+      // Split capacity across concurrent use cases
       const effectiveDailyCapacity = dailyCapacity / concurrentCount
-      totalEffectiveCapacity += effectiveDailyCapacity
+      totalEffectiveHoursPerDay += effectiveDailyCapacity
     }
+
+    // Convert to man-days per day (8 hours = 1 man-day)
+    const effectiveManDaysPerDay = totalEffectiveHoursPerDay / 8
 
     timelines.push({
       useCaseId: period.useCase.id,
       startDate: period.startDate,
       endDate: period.endDate,
-      duration, // Duration in working days, dynamically calculated considering allocation and concurrency
-      effectiveCapacity: totalEffectiveCapacity
+      duration, // Duration in working days
+      calendarDays, // Duration in calendar days (including weekends)
+      effectiveCapacity: effectiveManDaysPerDay, // Man-days per working day
+      manDays: period.useCase.manDays // Raw effort requirement
     })
   }
 

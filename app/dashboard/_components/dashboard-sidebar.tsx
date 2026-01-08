@@ -9,7 +9,8 @@ import {
   GanttChartSquare,
   TrendingUp,
   GitBranch,
-  Settings
+  Settings,
+  BookOpen
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -23,6 +24,7 @@ type ViewType =
   | "gantt"
   | "planning"
   | "settings"
+  | "guide"
 
 interface DashboardSidebarProps {
   currentView: ViewType
@@ -37,7 +39,8 @@ const navigation = [
   { id: "timeline", label: "Timeline", icon: Calendar },
   { id: "gantt", label: "Gantt Chart", icon: GanttChartSquare },
   { id: "planning", label: "Planning", icon: TrendingUp },
-  { id: "settings", label: "Effort Config", icon: Settings }
+  { id: "settings", label: "Effort Config", icon: Settings },
+  { id: "guide", label: "Estimation Guide", icon: BookOpen }
 ] as const
 
 export function DashboardSidebar({

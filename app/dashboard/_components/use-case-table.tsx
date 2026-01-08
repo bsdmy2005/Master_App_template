@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -30,7 +30,6 @@ import {
   type ColumnConfig
 } from "./column-settings"
 import { SubtaskTable } from "./subtask-table"
-import { calculateTimelines } from "@/lib/timeline-calculator"
 import type {
   PlanningData,
   UseCase,
@@ -77,16 +76,6 @@ export function UseCaseTable({
   const [collapsedClients, setCollapsedClients] = useState<Set<string>>(
     new Set(data.clients.map((c) => c.id))
   )
-
-  // Calculate timelines for dynamic mandaya
-  const timelineResult = useMemo(() => calculateTimelines(data), [data])
-  const timelinesByUseCaseId = useMemo(() => {
-    const map = new Map<string, typeof timelineResult.timelines[0]>()
-    for (const timeline of timelineResult.timelines) {
-      map.set(timeline.useCaseId, timeline)
-    }
-    return map
-  }, [timelineResult.timelines])
 
   // Get visible columns sorted by order
   const visibleColumns = columns
@@ -215,12 +204,10 @@ export function UseCaseTable({
           </TableCell>
         )
       case "manDays":
-        const timeline = timelinesByUseCaseId.get(useCase.id)
-        // Show duration (working days) if timeline exists, otherwise show initial mandays
-        const displayValue = timeline?.duration ?? useCase.manDays
+        // Always show the raw effort estimate (complexity × gap formula), not adjusted for velocity
         return (
           <TableCell key="manDays" className="text-right">
-            {displayValue.toFixed(1)} {timeline ? "days" : "man-days"}
+            {useCase.manDays.toFixed(1)} man-days
           </TableCell>
         )
       case "status":

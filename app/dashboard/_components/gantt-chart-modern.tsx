@@ -28,15 +28,21 @@ import {
   ChevronDown,
   ChevronRight,
   Search,
-  CalendarDays
+  CalendarDays,
+  ChevronLeft,
+  GripVertical,
+  Maximize2,
+  Minimize2
 } from "lucide-react"
 import type { PlanningData, TimeScale, GanttFilters } from "@/types/planning-types"
 import { calculateTimelines, type UseCaseTimeline } from "@/lib/timeline-calculator"
+import { writePlanningDataWithFallback } from "@/lib/storage-db"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 
 // Constants for layout
 const ROW_HEIGHT = 48 // Height of each Gantt row in pixels
-const SIDEBAR_WIDTH = 280 // Width of the fixed left sidebar
+const SIDEBAR_WIDTH = 240 // Width of the fixed left sidebar (compact, tooltips show details)
 const HEADER_HEIGHT = 72 // Height of the timeline header (two tiers)
 const MIN_BAR_WIDTH = 4 // Minimum bar width in pixels
 const MAJOR_TIER_HEIGHT = 28 // Height of major labels tier
@@ -61,6 +67,7 @@ const PRIORITY_STYLES: Record<string, string> = {
 
 interface GanttChartModernProps {
   data: PlanningData
+  setData?: (data: PlanningData) => void
 }
 
 // Helper functions
@@ -431,7 +438,7 @@ function getOptimalScale(start: Date, end: Date): TimeScale {
   return "year"
 }
 
-export function GanttChartModern({ data }: GanttChartModernProps) {
+export function GanttChartModern({ data, setData }: GanttChartModernProps) {
   // State
   const [timeScale, setTimeScale] = useState<TimeScale>("week")
   const [filters, setFilters] = useState<GanttFilters>({ clientIds: [], useCaseIds: [] })
@@ -439,6 +446,20 @@ export function GanttChartModern({ data }: GanttChartModernProps) {
   const [showFilters, setShowFilters] = useState(false)
   const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set())
   const [zoomLevel, setZoomLevel] = useState(1)
+
+  // Timeline navigation - null means auto (1 week before today)
+  const [viewStartDate, setViewStartDate] = useState<Date | null>(null)
+
+  // Drag state
+  const [dragState, setDragState] = useState<{
+    useCaseId: string
+    initialX: number
+    initialLeft: number
+    currentX: number
+  } | null>(null)
+
+  // Full-screen mode
+  const [isFullScreen, setIsFullScreen] = useState(false)
 
   // Refs
   const timelineRef = useRef<HTMLDivElement>(null)
@@ -483,48 +504,58 @@ export function GanttChartModern({ data }: GanttChartModernProps) {
   }, [timelineResult.timelines, filters, searchQuery, data])
 
   // Calculate timeline bounds
-  // Always start from 1 week before today, extend based on scale
-  const { timelineStart, timelineEnd } = useMemo(() => {
+  // If viewStartDate is set, use that as the start; otherwise auto-calculate
+  const { timelineStart, timelineEnd, dataStartDate, dataEndDate } = useMemo(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    // Always start 1 week before today
-    const start = new Date(today)
-    start.setDate(start.getDate() - 7)
-
-    // Find the latest end date from data
+    // Find the earliest start date and latest end date from data
+    let dataStart = new Date(today)
     let dataEnd = new Date(today)
     if (filteredTimelines.length > 0) {
+      dataStart = new Date(Math.min(...filteredTimelines.map((t) => t.startDate.getTime())))
       dataEnd = new Date(Math.max(...filteredTimelines.map((t) => t.endDate.getTime())))
     }
+
+    // Use viewStartDate if set, otherwise auto (1 week before today or data start, whichever is earlier)
+    let start: Date
+    if (viewStartDate) {
+      start = new Date(viewStartDate)
+    } else {
+      // Auto: start from 1 week before today, or data start if earlier
+      const weekBeforeToday = new Date(today)
+      weekBeforeToday.setDate(weekBeforeToday.getDate() - 7)
+      start = new Date(Math.min(weekBeforeToday.getTime(), dataStart.getTime()))
+    }
+    start.setHours(0, 0, 0, 0)
 
     // Extend timeline based on scale to show future periods
     const extendedEnd = new Date(dataEnd)
     switch (timeScale) {
       case "day":
-        // Show at least 2 weeks beyond data
         extendedEnd.setDate(extendedEnd.getDate() + 14)
         break
       case "week":
-        // Show at least 4 weeks beyond data
         extendedEnd.setDate(extendedEnd.getDate() + 28)
         break
       case "month":
-        // Show at least 2 months beyond data
         extendedEnd.setMonth(extendedEnd.getMonth() + 2)
         break
       case "quarter":
-        // Show at least 1 quarter beyond data
         extendedEnd.setMonth(extendedEnd.getMonth() + 3)
         break
       case "year":
-        // Show at least 1 year beyond data
         extendedEnd.setFullYear(extendedEnd.getFullYear() + 1)
         break
     }
 
-    return { timelineStart: start, timelineEnd: extendedEnd }
-  }, [filteredTimelines, timeScale])
+    return {
+      timelineStart: start,
+      timelineEnd: extendedEnd,
+      dataStartDate: dataStart,
+      dataEndDate: dataEnd
+    }
+  }, [filteredTimelines, timeScale, viewStartDate])
 
   // Auto-set optimal scale on data change
   useEffect(() => {
@@ -594,8 +625,14 @@ export function GanttChartModern({ data }: GanttChartModernProps) {
     [timelineStart, pixelsPerDay]
   )
 
-  // Sync scroll between timeline and header
+  // Track which element initiated the scroll to prevent loops
+  const isScrollingSyncRef = useRef(false)
+
+  // Sync scroll between timeline and header/sidebar
   const handleTimelineScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (isScrollingSyncRef.current) return
+    isScrollingSyncRef.current = true
+
     const scrollLeft = e.currentTarget.scrollLeft
     const scrollTop = e.currentTarget.scrollTop
 
@@ -605,6 +642,26 @@ export function GanttChartModern({ data }: GanttChartModernProps) {
     if (sidebarRef.current) {
       sidebarRef.current.scrollTop = scrollTop
     }
+
+    requestAnimationFrame(() => {
+      isScrollingSyncRef.current = false
+    })
+  }, [])
+
+  // Sync scroll from sidebar to timeline
+  const handleSidebarScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (isScrollingSyncRef.current) return
+    isScrollingSyncRef.current = true
+
+    const scrollTop = e.currentTarget.scrollTop
+
+    if (timelineRef.current) {
+      timelineRef.current.scrollTop = scrollTop
+    }
+
+    requestAnimationFrame(() => {
+      isScrollingSyncRef.current = false
+    })
   }, [])
 
   // Toggle client collapse
@@ -629,6 +686,7 @@ export function GanttChartModern({ data }: GanttChartModernProps) {
     setFilters({ clientIds: [], useCaseIds: [] })
     setSearchQuery("")
     setCollapsedClients(new Set())
+    setViewStartDate(null) // Reset to auto
   }
 
   // Jump to today
@@ -637,6 +695,161 @@ export function GanttChartModern({ data }: GanttChartModernProps) {
       timelineRef.current.scrollLeft = todayPosition - timelineRef.current.clientWidth / 2
     }
   }
+
+  // Timeline navigation
+  const navigateTimeline = (direction: "back" | "forward") => {
+    const current = viewStartDate || timelineStart
+    const newDate = new Date(current)
+
+    // Amount to move depends on scale
+    switch (timeScale) {
+      case "day":
+        newDate.setDate(newDate.getDate() + (direction === "back" ? -7 : 7))
+        break
+      case "week":
+        newDate.setDate(newDate.getDate() + (direction === "back" ? -28 : 28))
+        break
+      case "month":
+        newDate.setMonth(newDate.getMonth() + (direction === "back" ? -3 : 3))
+        break
+      case "quarter":
+        newDate.setMonth(newDate.getMonth() + (direction === "back" ? -6 : 6))
+        break
+      case "year":
+        newDate.setFullYear(newDate.getFullYear() + (direction === "back" ? -1 : 1))
+        break
+    }
+
+    setViewStartDate(newDate)
+  }
+
+  // Jump to data start (earliest use case)
+  const jumpToDataStart = () => {
+    if (filteredTimelines.length > 0) {
+      const earliest = new Date(Math.min(...filteredTimelines.map((t) => t.startDate.getTime())))
+      earliest.setDate(earliest.getDate() - 7) // A bit of buffer
+      setViewStartDate(earliest)
+    }
+  }
+
+  // Drag handlers for rescheduling
+  const handleDragStart = (useCaseId: string, e: React.MouseEvent) => {
+    if (!setData) return // Can't drag if no setData
+
+    e.preventDefault()
+    const bar = e.currentTarget as HTMLElement
+    const barRect = bar.getBoundingClientRect()
+
+    setDragState({
+      useCaseId,
+      initialX: e.clientX,
+      initialLeft: bar.offsetLeft,
+      currentX: e.clientX
+    })
+
+    // Add cursor style to body during drag
+    document.body.style.cursor = "grabbing"
+  }
+
+  const handleDragMove = useCallback(
+    (e: MouseEvent) => {
+      if (!dragState) return
+
+      setDragState((prev) => prev ? { ...prev, currentX: e.clientX } : null)
+    },
+    [dragState]
+  )
+
+  const handleDragEnd = useCallback(
+    async (e: MouseEvent) => {
+      if (!dragState || !setData) {
+        setDragState(null)
+        document.body.style.cursor = ""
+        return
+      }
+
+      // Calculate new position
+      const deltaX = dragState.currentX - dragState.initialX
+      const newLeft = dragState.initialLeft + deltaX
+
+      // Convert pixel position to date
+      const daysFromStart = newLeft / pixelsPerDay
+      const newStartDate = new Date(timelineStart)
+      newStartDate.setDate(newStartDate.getDate() + Math.round(daysFromStart))
+      newStartDate.setHours(0, 0, 0, 0)
+
+      // Find the use case and update it
+      const useCase = data.useCases.find((uc) => uc.id === dragState.useCaseId)
+      if (!useCase) {
+        setDragState(null)
+        document.body.style.cursor = ""
+        return
+      }
+
+      // Update the use case with new start date
+      const updatedUseCases = data.useCases.map((uc) =>
+        uc.id === dragState.useCaseId
+          ? { ...uc, startDate: newStartDate.toISOString().split("T")[0], updatedAt: new Date().toISOString() }
+          : uc
+      )
+
+      const updatedData: PlanningData = {
+        ...data,
+        useCases: updatedUseCases
+      }
+
+      // Update local state
+      setData(updatedData)
+
+      // Persist to storage
+      try {
+        await writePlanningDataWithFallback(updatedData)
+        toast.success("Start date updated", {
+          description: `${useCase.useCaseId} moved to ${newStartDate.toLocaleDateString()}`
+        })
+      } catch (error) {
+        console.error("Failed to save:", error)
+        toast.error("Failed to save changes")
+      }
+
+      setDragState(null)
+      document.body.style.cursor = ""
+    },
+    [dragState, pixelsPerDay, timelineStart, data, setData]
+  )
+
+  // Add/remove global mouse event listeners for dragging
+  useEffect(() => {
+    if (dragState) {
+      window.addEventListener("mousemove", handleDragMove)
+      window.addEventListener("mouseup", handleDragEnd)
+      return () => {
+        window.removeEventListener("mousemove", handleDragMove)
+        window.removeEventListener("mouseup", handleDragEnd)
+      }
+    }
+  }, [dragState, handleDragMove, handleDragEnd])
+
+  // Full-screen keyboard shortcut (Ctrl/Cmd + Shift + F or Escape to exit)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Toggle with Ctrl/Cmd + Shift + F
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "f") {
+        e.preventDefault()
+        setIsFullScreen((prev) => !prev)
+      }
+      // Exit with Escape
+      if (e.key === "Escape" && isFullScreen) {
+        setIsFullScreen(false)
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [isFullScreen])
+
+  // Toggle full-screen mode
+  const toggleFullScreen = () => setIsFullScreen((prev) => !prev)
 
   // Filter counts
   const hasActiveFilters = filters.clientIds.length > 0 || filters.useCaseIds.length > 0 || searchQuery.length > 0
@@ -654,7 +867,14 @@ export function GanttChartModern({ data }: GanttChartModernProps) {
   }
 
   return (
-    <div className="h-full flex flex-col bg-background">
+    <div
+      className={cn(
+        "flex flex-col bg-background",
+        isFullScreen
+          ? "fixed inset-0 z-50"
+          : "h-full"
+      )}
+    >
       {/* Header Controls */}
       <div className="shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-20 px-4 py-3">
         <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -707,15 +927,46 @@ export function GanttChartModern({ data }: GanttChartModernProps) {
 
           {/* Right: Actions */}
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={jumpToToday}
-              disabled={todayPosition === null}
-            >
-              <CalendarDays className="h-4 w-4 mr-1" />
-              Today
-            </Button>
+            {/* Timeline Navigation */}
+            <div className="flex items-center border rounded-md">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigateTimeline("back")}
+                className="px-2"
+                title="Go back in time"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={jumpToDataStart}
+                className="px-2 text-xs"
+                title="Jump to earliest use case"
+              >
+                Start
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={jumpToToday}
+                disabled={todayPosition === null}
+                className="px-2 text-xs"
+                title="Jump to today"
+              >
+                Today
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigateTimeline("forward")}
+                className="px-2"
+                title="Go forward in time"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
 
             <div className="flex items-center border rounded-md">
               <Button variant="ghost" size="sm" onClick={handleZoomOut} className="px-2">
@@ -743,9 +994,33 @@ export function GanttChartModern({ data }: GanttChartModernProps) {
               )}
             </Button>
 
-            <Button variant="ghost" size="sm" onClick={handleReset}>
+            <Button variant="ghost" size="sm" onClick={handleReset} title="Reset view">
               <RotateCcw className="h-4 w-4" />
             </Button>
+
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={isFullScreen ? "default" : "outline"}
+                    size="sm"
+                    onClick={toggleFullScreen}
+                  >
+                    {isFullScreen ? (
+                      <Minimize2 className="h-4 w-4" />
+                    ) : (
+                      <Maximize2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="bg-white text-gray-900 border border-gray-200 shadow-lg">
+                  <p>{isFullScreen ? "Exit full screen" : "Full screen"}</p>
+                  <p className="text-xs text-gray-500">
+                    {isFullScreen ? "Esc" : "Ctrl+Shift+F"}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
 
@@ -797,7 +1072,6 @@ export function GanttChartModern({ data }: GanttChartModernProps) {
       <div className="flex-1 flex overflow-hidden">
         {/* Fixed Sidebar */}
         <div
-          ref={sidebarRef}
           className="shrink-0 border-r bg-muted/30 overflow-hidden"
           style={{ width: SIDEBAR_WIDTH }}
         >
@@ -810,7 +1084,12 @@ export function GanttChartModern({ data }: GanttChartModernProps) {
           </div>
 
           {/* Sidebar content - synced scroll with timeline */}
-          <div className="overflow-hidden" style={{ height: `calc(100% - ${HEADER_HEIGHT}px)` }}>
+          <div
+            ref={sidebarRef}
+            className="overflow-y-auto scrollbar-hide"
+            style={{ height: `calc(100% - ${HEADER_HEIGHT}px)` }}
+            onScroll={handleSidebarScroll}
+          >
             <div>
               {Array.from(groupedTimelines.entries()).map(([clientId, group]) => {
                 const isCollapsed = collapsedClients.has(clientId)
@@ -837,18 +1116,34 @@ export function GanttChartModern({ data }: GanttChartModernProps) {
                     {/* Use case rows */}
                     {!isCollapsed &&
                       group.items.map(({ useCase }) => (
-                        <div
-                          key={useCase.id}
-                          className="flex items-center gap-2 px-3 pl-8 border-b hover:bg-muted/40 transition-colors"
-                          style={{ height: ROW_HEIGHT }}
-                        >
-                          <Badge variant="outline" className="shrink-0 font-mono text-xs">
-                            {useCase.useCaseId}
-                          </Badge>
-                          <span className="truncate text-sm" title={useCase.title}>
-                            {useCase.title}
-                          </span>
-                        </div>
+                        <TooltipProvider key={useCase.id} delayDuration={300}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div
+                                className="flex items-center gap-2 px-3 pl-8 border-b hover:bg-muted/40 transition-colors cursor-default"
+                                style={{ height: ROW_HEIGHT }}
+                              >
+                                <Badge variant="outline" className="shrink-0 font-mono text-xs">
+                                  {useCase.useCaseId}
+                                </Badge>
+                                <span className="truncate text-sm">
+                                  {useCase.title}
+                                </span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="right"
+                              className="max-w-sm bg-white text-gray-900 border border-gray-200 shadow-lg"
+                            >
+                              <div className="space-y-1">
+                                <div className="font-semibold">{useCase.useCaseId}: {useCase.title}</div>
+                                {useCase.description && (
+                                  <p className="text-xs text-gray-500">{useCase.description}</p>
+                                )}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       ))}
                   </div>
                 )
@@ -970,7 +1265,7 @@ export function GanttChartModern({ data }: GanttChartModernProps) {
                     {/* Use case bars */}
                     {!isCollapsed &&
                       group.items.map(({ timeline, useCase }) => {
-                        const { left, width } = getBarPosition(timeline)
+                        const { left: originalLeft, width } = getBarPosition(timeline)
                         const statusStyle = STATUS_COLORS[useCase.status] || STATUS_COLORS["high-level definition"]
                         const priorityStyle = PRIORITY_STYLES[useCase.priority] || ""
 
@@ -987,22 +1282,32 @@ export function GanttChartModern({ data }: GanttChartModernProps) {
                           c.useCaseIds.includes(useCase.id)
                         )
 
+                        // Check if this bar is being dragged
+                        const isDragging = dragState?.useCaseId === useCase.id
+                        const dragOffset = isDragging ? dragState.currentX - dragState.initialX : 0
+                        const left = originalLeft + dragOffset
+
+                        // Can this bar be dragged?
+                        const canDrag = !!setData
+
                         return (
                           <div
                             key={useCase.id}
                             className="relative border-b"
                             style={{ height: ROW_HEIGHT }}
                           >
-                            <TooltipProvider delayDuration={100}>
+                            <TooltipProvider delayDuration={isDragging ? 9999 : 100}>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <div
                                     className={cn(
-                                      "absolute top-1/2 -translate-y-1/2 rounded cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg",
+                                      "absolute top-1/2 -translate-y-1/2 rounded transition-all",
+                                      canDrag ? "cursor-grab hover:scale-[1.02] hover:shadow-lg" : "cursor-pointer",
+                                      isDragging && "cursor-grabbing shadow-xl scale-105 z-50 ring-2 ring-primary",
                                       statusStyle.bg,
                                       statusStyle.border,
                                       priorityStyle,
-                                      hasConflict && "ring-2 ring-yellow-400 ring-offset-1",
+                                      hasConflict && !isDragging && "ring-2 ring-yellow-400 ring-offset-1",
                                       "border"
                                     )}
                                     style={{
@@ -1010,7 +1315,28 @@ export function GanttChartModern({ data }: GanttChartModernProps) {
                                       width,
                                       height: ROW_HEIGHT - 12
                                     }}
+                                    onMouseDown={(e) => canDrag && handleDragStart(useCase.id, e)}
                                   >
+                                    {/* Drag handle indicator */}
+                                    {canDrag && (
+                                      <div className="absolute left-1 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100">
+                                        <GripVertical className="h-3 w-3 text-white/70" />
+                                      </div>
+                                    )}
+
+                                    {/* Man-days label on bar (when wide enough) */}
+                                    {width > 60 && (
+                                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <span className={cn(
+                                          "text-xs font-semibold",
+                                          statusStyle.text,
+                                          "drop-shadow-sm"
+                                        )}>
+                                          {useCase.manDays}d
+                                        </span>
+                                      </div>
+                                    )}
+
                                     {/* Progress overlay */}
                                     {progress > 0 && (
                                       <div
@@ -1030,38 +1356,65 @@ export function GanttChartModern({ data }: GanttChartModernProps) {
                                     {useCase.priority === "high" && (
                                       <div className="absolute -top-1 -left-1 w-3 h-3 bg-red-500 rounded-full border border-white" />
                                     )}
+
+                                    {/* Drag preview - show new date */}
+                                    {isDragging && (
+                                      <div className="absolute -top-8 left-0 bg-primary text-primary-foreground text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap z-50">
+                                        {(() => {
+                                          const daysFromStart = left / pixelsPerDay
+                                          const newDate = new Date(timelineStart)
+                                          newDate.setDate(newDate.getDate() + Math.round(daysFromStart))
+                                          return newDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                                        })()}
+                                      </div>
+                                    )}
                                   </div>
                                 </TooltipTrigger>
-                                <TooltipContent side="top" className="max-w-xs">
+                                <TooltipContent
+                                  side="top"
+                                  className="max-w-xs bg-white text-gray-900 border border-gray-200 shadow-lg"
+                                >
                                   <div className="space-y-2">
                                     <div>
-                                      <div className="font-semibold">{useCase.useCaseId}: {useCase.title}</div>
+                                      <div className="font-semibold text-gray-900">{useCase.useCaseId}: {useCase.title}</div>
                                       {useCase.description && (
-                                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">
                                           {useCase.description}
                                         </p>
                                       )}
                                     </div>
-                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-900">
                                       <div>
-                                        <span className="text-muted-foreground">Start:</span>{" "}
+                                        <span className="text-gray-500">Start:</span>{" "}
                                         {formatDate(timeline.startDate, "day")}
                                       </div>
                                       <div>
-                                        <span className="text-muted-foreground">End:</span>{" "}
+                                        <span className="text-gray-500">End:</span>{" "}
                                         {formatDate(timeline.endDate, "day")}
                                       </div>
                                       <div>
-                                        <span className="text-muted-foreground">Duration:</span>{" "}
-                                        {timeline.duration} days
+                                        <span className="text-gray-500">Effort:</span>{" "}
+                                        <span className="font-medium">{useCase.manDays} man-days</span>
                                       </div>
                                       <div>
-                                        <span className="text-muted-foreground">Progress:</span>{" "}
+                                        <span className="text-gray-500">Working Days:</span>{" "}
+                                        {timeline.duration}
+                                      </div>
+                                      <div>
+                                        <span className="text-gray-500">Calendar Days:</span>{" "}
+                                        {timeline.calendarDays}
+                                      </div>
+                                      <div>
+                                        <span className="text-gray-500">Velocity:</span>{" "}
+                                        {timeline.effectiveCapacity.toFixed(1)} man-days/day
+                                      </div>
+                                      <div>
+                                        <span className="text-gray-500">Progress:</span>{" "}
                                         {progress.toFixed(0)}%
                                       </div>
                                     </div>
                                     <div className="flex gap-1 flex-wrap">
-                                      <Badge variant="outline" className="text-[10px]">
+                                      <Badge variant="outline" className="text-[10px] border-gray-300 text-gray-700">
                                         {useCase.status}
                                       </Badge>
                                       <Badge
@@ -1072,8 +1425,8 @@ export function GanttChartModern({ data }: GanttChartModernProps) {
                                       </Badge>
                                     </div>
                                     {useCase.assignedDeveloperIds && useCase.assignedDeveloperIds.length > 0 && (
-                                      <div className="text-xs">
-                                        <span className="text-muted-foreground">Team:</span>{" "}
+                                      <div className="text-xs text-gray-900">
+                                        <span className="text-gray-500">Team:</span>{" "}
                                         {useCase.assignedDeveloperIds
                                           .map((id) => data.developers.find((d) => d.id === id)?.name)
                                           .filter(Boolean)

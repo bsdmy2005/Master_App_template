@@ -1504,7 +1504,8 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
               sdkGaps: useCase.sdkGaps || "",
               status: useCase.status,
               priority: useCase.priority,
-              startDate: useCase.startDate || "",
+              // Ensure date is in YYYY-MM-DD format for HTML date input
+              startDate: useCase.startDate ? useCase.startDate.split("T")[0] : "",
               assignedDeveloperIds: useCase.assignedDeveloperIds || []
             })
             // Load tasks for this use case
@@ -1604,7 +1605,8 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
                                 sdkGaps: useCase.sdkGaps || "",
                                 status: useCase.status,
                                 priority: useCase.priority,
-                                startDate: useCase.startDate || "",
+                                // Ensure date is in YYYY-MM-DD format for HTML date input
+                                startDate: useCase.startDate ? useCase.startDate.split("T")[0] : "",
                                 assignedDeveloperIds: useCase.assignedDeveloperIds || []
                               })
                               // Load tasks for this use case
@@ -1657,7 +1659,8 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
                         sdkGaps: useCase.sdkGaps || "",
                         status: useCase.status,
                         priority: useCase.priority,
-                        startDate: useCase.startDate || "",
+                        // Ensure date is in YYYY-MM-DD format for HTML date input
+                        startDate: useCase.startDate ? useCase.startDate.split("T")[0] : "",
                         assignedDeveloperIds: useCase.assignedDeveloperIds || []
                       })
                       // Load tasks for this use case

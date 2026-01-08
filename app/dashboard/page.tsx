@@ -11,6 +11,7 @@ import { TimelineView } from "./_components/timeline-view"
 import { GanttChartModern } from "./_components/gantt-chart-modern"
 import { DeveloperPlanning } from "./_components/developer-planning"
 import { EffortConfig } from "./_components/effort-config"
+import { EstimationGuide } from "./_components/estimation-guide"
 import { EffortConfigProvider } from "@/lib/effort-config-context"
 import type { PlanningData } from "@/types/planning-types"
 import { readPlanningDataWithFallback, writePlanningDataWithFallback } from "@/lib/storage-db"
@@ -28,6 +29,7 @@ type ViewType =
   | "gantt"
   | "planning"
   | "settings"
+  | "guide"
 
 export default function DashboardPage() {
   const [currentView, setCurrentView] = useState<ViewType>("overview")
@@ -127,13 +129,14 @@ export default function DashboardPage() {
               <DependencyManagement data={data} setData={setData} />
             )}
             {currentView === "timeline" && data && <TimelineView data={data} />}
-            {currentView === "gantt" && data && <GanttChartModern data={data} />}
+            {currentView === "gantt" && data && <GanttChartModern data={data} setData={setData} />}
             {currentView === "planning" && data && (
               <DeveloperPlanning data={data} setData={setData} />
             )}
             {currentView === "settings" && data && (
               <EffortConfig data={data} setData={setData} />
             )}
+            {currentView === "guide" && <EstimationGuide />}
           </motion.div>
         </main>
       </div>

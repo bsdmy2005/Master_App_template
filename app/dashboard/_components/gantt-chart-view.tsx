@@ -9,7 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from "@/components/ui/tooltip"
-import { Calendar } from "lucide-react"
+import { Calendar, ChevronDown, ChevronUp } from "lucide-react"
 import type { PlanningData, TimeScale, GanttFilters } from "@/types/planning-types"
 import { calculateTimelines, type UseCaseTimeline } from "@/lib/timeline-calculator"
 import { TimelineControls } from "./timeline-controls"
@@ -101,6 +101,7 @@ export function GanttChartView({ data }: GanttChartViewProps) {
     useCaseIds: []
   })
   const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set())
+  const [expandedLabels, setExpandedLabels] = useState<Set<string>>(new Set())
 
   // Calculate timelines
   const timelineResult = useMemo(() => {
@@ -197,6 +198,17 @@ export function GanttChartView({ data }: GanttChartViewProps) {
 
     return grouped
   }, [filteredTimelines, data, filters])
+
+  // Toggle label expansion
+  const toggleLabelExpansion = useCallback((useCaseId: string) => {
+    const newExpanded = new Set(expandedLabels)
+    if (newExpanded.has(useCaseId)) {
+      newExpanded.delete(useCaseId)
+    } else {
+      newExpanded.add(useCaseId)
+    }
+    setExpandedLabels(newExpanded)
+  }, [expandedLabels])
 
   // Weekend markers for full-height background (only for day/week scale)
   const weekendMarkers = useMemo(() => {
@@ -664,17 +676,57 @@ export function GanttChartView({ data }: GanttChartViewProps) {
                                         </div>
                                       )}
                                       
-                                      <div className="flex items-center gap-2 truncate w-full z-10 relative">
+                                      <div className="flex items-center gap-1 truncate w-full z-10 relative">
                                         <Badge
                                           variant="outline"
                                           className="text-[10px] shrink-0 bg-white/20 text-white border-white/30 font-semibold"
                                         >
                                           {useCase.useCaseId}
                                         </Badge>
-                                        <span className="truncate text-[11px] font-medium">
+                                        <span className="truncate text-[11px] font-medium flex-1">
                                           {useCase.title}
                                         </span>
+                                        {/* Expand/collapse button */}
+                                        {useCase.description && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              toggleLabelExpansion(useCase.id)
+                                            }}
+                                            className="shrink-0 ml-1 p-0.5 hover:bg-white/20 rounded transition-colors z-20"
+                                          >
+                                            {expandedLabels.has(useCase.id) ? (
+                                              <ChevronUp className="w-2.5 h-2.5 text-white" />
+                                            ) : (
+                                              <ChevronDown className="w-2.5 h-2.5 text-white" />
+                                            )}
+                                          </button>
+                                        )}
                                       </div>
+
+                                      {/* Expanded description and acceptance criteria */}
+                                      {expandedLabels.has(useCase.id) && (useCase.description || useCase.keyAcceptanceCriteria) && (
+                                        <div className="mt-1 text-[10px] text-white/90 leading-tight max-w-full z-10 relative">
+                                          <div className="bg-black/60 backdrop-blur-sm rounded px-2 py-1 border border-white/20 space-y-2">
+                                            {useCase.description && (
+                                              <div>
+                                                <div className="font-medium mb-1">Description:</div>
+                                                <div className="whitespace-pre-wrap break-words">
+                                                  {useCase.description}
+                                                </div>
+                                              </div>
+                                            )}
+                                            {useCase.keyAcceptanceCriteria && (
+                                              <div>
+                                                <div className="font-medium mb-1">Key Acceptance Criteria:</div>
+                                                <div className="whitespace-pre-wrap break-words">
+                                                  {useCase.keyAcceptanceCriteria}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
                                       
                                       {/* Developer avatars/initials */}
                                       {assignedDevelopers.length > 0 && (
