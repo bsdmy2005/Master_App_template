@@ -91,6 +91,7 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
     useCaseId: "",
     title: "",
     description: "",
+    keyAcceptanceCriteria: "",
     complexity: "medium" as Complexity,
     gap: "moderate-extension" as GapLevel,
     sdkGaps: "",
@@ -340,6 +341,7 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
         useCaseId: "",
         title: "",
         description: "",
+        keyAcceptanceCriteria: "",
         complexity: "medium",
         gap: "moderate-extension" as GapLevel,
         sdkGaps: "",
@@ -808,6 +810,7 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
                   useCaseId: "",
                   title: "",
                   description: "",
+                  keyAcceptanceCriteria: "",
                   complexity: "medium",
                   gap: "moderate-extension" as GapLevel,
                   sdkGaps: "",
@@ -906,6 +909,21 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
                       })
                     }
                     rows={3}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="usecase-key-acceptance-criteria">Key Acceptance Criteria</Label>
+                  <Textarea
+                    id="usecase-key-acceptance-criteria"
+                    value={useCaseFormData.keyAcceptanceCriteria}
+                    onChange={(e) =>
+                      setUseCaseFormData({
+                        ...useCaseFormData,
+                        keyAcceptanceCriteria: e.target.value
+                      })
+                    }
+                    rows={3}
+                    placeholder="Enter key acceptance criteria for this use case..."
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -1480,6 +1498,7 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
               useCaseId: useCase.useCaseId,
               title: useCase.title,
               description: useCase.description || "",
+              keyAcceptanceCriteria: useCase.keyAcceptanceCriteria || "",
               complexity: useCase.complexity,
               gap: useCase.gap,
               sdkGaps: useCase.sdkGaps || "",
@@ -1579,6 +1598,7 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
                                 useCaseId: useCase.useCaseId,
                                 title: useCase.title,
                                 description: useCase.description || "",
+                                keyAcceptanceCriteria: useCase.keyAcceptanceCriteria || "",
                                 complexity: useCase.complexity,
                                 gap: useCase.gap,
                                 sdkGaps: useCase.sdkGaps || "",
@@ -1631,6 +1651,7 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
                         useCaseId: useCase.useCaseId,
                         title: useCase.title,
                         description: useCase.description || "",
+                        keyAcceptanceCriteria: useCase.keyAcceptanceCriteria || "",
                         complexity: useCase.complexity,
                         gap: useCase.gap,
                         sdkGaps: useCase.sdkGaps || "",
@@ -1721,6 +1742,14 @@ function UseCaseCard({
           <p className="text-sm text-muted-foreground line-clamp-2">
             {useCase.description}
           </p>
+        )}
+        {useCase.keyAcceptanceCriteria && (
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">Key Acceptance Criteria:</p>
+            <p className="text-sm text-muted-foreground line-clamp-3">
+              {useCase.keyAcceptanceCriteria}
+            </p>
+          </div>
         )}
         <div className="flex flex-wrap gap-2">
           <Badge className={complexityColors[useCase.complexity]}>

@@ -169,6 +169,27 @@ export function UseCaseTable({
             </div>
           </TableCell>
         )
+      case "keyAcceptanceCriteria":
+        return (
+          <TableCell key="keyAcceptanceCriteria">
+            <div className="min-w-[200px] max-w-[400px] whitespace-normal break-words">
+              {useCase.keyAcceptanceCriteria ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="text-sm text-muted-foreground">
+                      {truncateText(useCase.keyAcceptanceCriteria, 100)}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[400px]">
+                    <p className="whitespace-pre-wrap">{useCase.keyAcceptanceCriteria}</p>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <span className="text-sm text-muted-foreground">—</span>
+              )}
+            </div>
+          </TableCell>
+        )
       case "complexity":
         return (
           <TableCell key="complexity">

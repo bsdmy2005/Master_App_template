@@ -28,6 +28,7 @@ export const useCasesTable = pgTable("use_cases", {
   useCaseId: text("use_case_id").notNull(), // e.g., "US-1"
   title: text("title").notNull(),
   description: text("description"),
+  keyAcceptanceCriteria: text("key_acceptance_criteria"),
   complexity: complexityEnum("complexity").notNull(),
   gap: gapLevelEnum("gap").notNull(),
   manDays: doublePrecision("man_days").notNull(),

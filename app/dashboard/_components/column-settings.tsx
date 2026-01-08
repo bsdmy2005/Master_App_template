@@ -28,15 +28,16 @@ const DEFAULT_COLUMNS: Omit<ColumnConfig, "visible">[] = [
   { id: "title", label: "Title", order: 2 },
   { id: "client", label: "Client", order: 3 },
   { id: "description", label: "Description", order: 4 },
-  { id: "complexity", label: "Complexity", order: 5 },
-  { id: "gap", label: "Gap", order: 6 },
-  { id: "manDays", label: "Man-Days", order: 7 },
-  { id: "status", label: "Status", order: 8 },
-  { id: "priority", label: "Priority", order: 9 },
-  { id: "startDate", label: "Start Date", order: 10 },
-  { id: "developers", label: "Developers", order: 11 },
-  { id: "sdkGaps", label: "SDK Gaps", order: 12 },
-  { id: "actions", label: "Actions", order: 13 }
+  { id: "keyAcceptanceCriteria", label: "Key Acceptance Criteria", order: 5 },
+  { id: "complexity", label: "Complexity", order: 6 },
+  { id: "gap", label: "Gap", order: 7 },
+  { id: "manDays", label: "Man-Days", order: 8 },
+  { id: "status", label: "Status", order: 9 },
+  { id: "priority", label: "Priority", order: 10 },
+  { id: "startDate", label: "Start Date", order: 11 },
+  { id: "developers", label: "Developers", order: 12 },
+  { id: "sdkGaps", label: "SDK Gaps", order: 13 },
+  { id: "actions", label: "Actions", order: 14 }
 ]
 
 const STORAGE_KEY = "useCaseTableColumns"
@@ -74,7 +75,7 @@ export function useColumnSettings() {
 
     return DEFAULT_COLUMNS.map((col) => ({
       ...col,
-      visible: col.id !== "sdkGaps", // Hide SDK Gaps by default
+      visible: col.id !== "sdkGaps" && col.id !== "keyAcceptanceCriteria", // Hide SDK Gaps and Key Acceptance Criteria by default
       // Always show expand and actions columns
       ...(col.id === "expand" || col.id === "actions" ? { visible: true } : {})
     }))

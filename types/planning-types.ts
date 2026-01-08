@@ -44,6 +44,7 @@ export interface UseCase {
   useCaseId: string // e.g., "US-1"
   title: string
   description?: string
+  keyAcceptanceCriteria?: string
   complexity: Complexity
   gap: GapLevel // 5-level system: 1=no gap, 5=very far
   manDays: number // calculated from complexity + gap
