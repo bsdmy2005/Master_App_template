@@ -387,7 +387,7 @@ export async function parsePlanSummary(): Promise<PlanningData> {
         manDays: calculatedManDays,
         sdkGaps: useCaseData.sdkGaps,
         status: "high-level definition",
-        priority: 0,
+        priority: "medium",
         createdAt: now,
         updatedAt: now
       }

@@ -2,6 +2,9 @@ import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
   devIndicators: false,
+  // Turbopack configuration (for dev mode)
+  turbopack: {},
+  // Webpack configuration (for production builds)
   webpack: (config, { isServer }) => {
     // Mark postgres as external for client-side builds
     if (!isServer) {

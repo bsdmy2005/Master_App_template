@@ -13,6 +13,9 @@ export async function createDeveloperAction(
   developer: InsertDeveloper
 ): Promise<ActionState<SelectDeveloper>> {
   try {
+    if (!db) {
+      return { isSuccess: false, message: "Database not available" }
+    }
     const [newDeveloper] = await db
       .insert(developersTable)
       .values(developer)
@@ -30,7 +33,10 @@ export async function createDeveloperAction(
 
 export async function getDevelopersAction(): Promise<ActionState<SelectDeveloper[]>> {
   try {
-    const developers = await db.query.developers.findMany()
+    if (!db) {
+      return { isSuccess: false, message: "Database not available" }
+    }
+    const developers = await db.select().from(developersTable)
     return {
       isSuccess: true,
       message: "Developers retrieved successfully",
@@ -47,6 +53,9 @@ export async function updateDeveloperAction(
   data: Partial<InsertDeveloper>
 ): Promise<ActionState<SelectDeveloper>> {
   try {
+    if (!db) {
+      return { isSuccess: false, message: "Database not available" }
+    }
     const [updatedDeveloper] = await db
       .update(developersTable)
       .set({ ...data, updatedAt: new Date() })
@@ -68,6 +77,9 @@ export async function deleteDeveloperAction(
   id: string
 ): Promise<ActionState<void>> {
   try {
+    if (!db) {
+      return { isSuccess: false, message: "Database not available" }
+    }
     await db.delete(developersTable).where(eq(developersTable.id, id))
     return {
       isSuccess: true,

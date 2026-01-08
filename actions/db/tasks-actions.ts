@@ -9,6 +9,9 @@ export async function createTaskAction(
   task: InsertTask
 ): Promise<ActionState<SelectTask>> {
   try {
+    if (!db) {
+      return { isSuccess: false, message: "Database not available" }
+    }
     const [newTask] = await db.insert(tasksTable).values(task).returning()
     return {
       isSuccess: true,
@@ -23,7 +26,10 @@ export async function createTaskAction(
 
 export async function getTasksAction(): Promise<ActionState<SelectTask[]>> {
   try {
-    const tasks = await db.query.tasks.findMany()
+    if (!db) {
+      return { isSuccess: false, message: "Database not available" }
+    }
+    const tasks = await db.select().from(tasksTable)
     return {
       isSuccess: true,
       message: "Tasks retrieved successfully",
@@ -39,9 +45,13 @@ export async function getTasksByUseCaseIdAction(
   useCaseId: string
 ): Promise<ActionState<SelectTask[]>> {
   try {
-    const tasks = await db.query.tasks.findMany({
-      where: eq(tasksTable.useCaseId, useCaseId)
-    })
+    if (!db) {
+      return { isSuccess: false, message: "Database not available" }
+    }
+    const tasks = await db
+      .select()
+      .from(tasksTable)
+      .where(eq(tasksTable.useCaseId, useCaseId))
     return {
       isSuccess: true,
       message: "Tasks retrieved successfully",
@@ -58,6 +68,9 @@ export async function updateTaskAction(
   data: Partial<InsertTask>
 ): Promise<ActionState<SelectTask>> {
   try {
+    if (!db) {
+      return { isSuccess: false, message: "Database not available" }
+    }
     const [updatedTask] = await db
       .update(tasksTable)
       .set({ ...data, updatedAt: new Date() })
@@ -77,6 +90,9 @@ export async function updateTaskAction(
 
 export async function deleteTaskAction(id: string): Promise<ActionState<void>> {
   try {
+    if (!db) {
+      return { isSuccess: false, message: "Database not available" }
+    }
     await db.delete(tasksTable).where(eq(tasksTable.id, id))
     return {
       isSuccess: true,

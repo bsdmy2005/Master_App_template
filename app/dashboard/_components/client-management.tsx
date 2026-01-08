@@ -180,8 +180,17 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
       if (editingClient) {
         const result = await updateClientAction(editingClient.id, clientData)
         if (result.isSuccess && result.data) {
+          // Convert database result (null) to Client type (undefined)
+          const updatedClient: Client = {
+            id: result.data.id,
+            name: result.data.name,
+            description: result.data.description || undefined,
+            systems: result.data.systems || undefined,
+            createdAt: result.data.createdAt.toISOString(),
+            updatedAt: result.data.updatedAt.toISOString()
+          }
           const updatedClients = data.clients.map((client) =>
-            client.id === editingClient.id ? result.data! : client
+            client.id === editingClient.id ? updatedClient : client
           )
           setData({ ...data, clients: updatedClients })
           setIsClientDialogOpen(false)
@@ -192,15 +201,22 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
           toast.error("Failed to update client: " + result.message)
         }
       } else {
-        const newClient: Client = {
-          id: `client-${Date.now()}`,
+        const clientWithId = {
           ...clientData,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          id: `client-${Date.now()}`
         }
-        const result = await createClientAction(newClient)
+        const result = await createClientAction(clientWithId)
         if (result.isSuccess && result.data) {
-          setData({ ...data, clients: [...data.clients, result.data] })
+          // Convert database result (null) to Client type (undefined)
+          const newClient: Client = {
+            id: result.data.id,
+            name: result.data.name,
+            description: result.data.description || undefined,
+            systems: result.data.systems || undefined,
+            createdAt: result.data.createdAt.toISOString(),
+            updatedAt: result.data.updatedAt.toISOString()
+          }
+          setData({ ...data, clients: [...data.clients, newClient] })
           setIsClientDialogOpen(false)
           setClientFormData({ name: "", description: "", systems: "" })
           toast.success("Client added successfully")
@@ -218,7 +234,9 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
           client.id === editingClient.id
             ? {
                 ...client,
-                ...clientData,
+                name: clientData.name,
+                description: clientData.description || undefined,
+                systems: clientData.systems.length > 0 ? clientData.systems : undefined,
                 updatedAt: now
               }
             : client
@@ -226,7 +244,9 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
       } else {
         const newClient: Client = {
           id: `client-${Date.now()}`,
-          ...clientData,
+          name: clientData.name,
+          description: clientData.description || undefined,
+          systems: clientData.systems.length > 0 ? clientData.systems : undefined,
           createdAt: now,
           updatedAt: now
         }

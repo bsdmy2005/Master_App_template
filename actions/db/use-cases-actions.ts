@@ -38,11 +38,7 @@ export async function getUseCasesAction(): Promise<ActionState<SelectUseCase[]>>
     if (!db) {
       return { isSuccess: false, message: "Database not available" }
     }
-    const useCases = await db.query.useCases.findMany({
-      with: {
-        client: true
-      }
-    })
+    const useCases = await db.select().from(useCasesTable)
     return {
       isSuccess: true,
       message: "Use cases retrieved successfully",
@@ -61,12 +57,11 @@ export async function getUseCaseByIdAction(
     if (!db) {
       return { isSuccess: false, message: "Database not available" }
     }
-    const useCase = await db.query.useCases.findFirst({
-      where: eq(useCasesTable.id, id),
-      with: {
-        client: true
-      }
-    })
+    const [useCase] = await db
+      .select()
+      .from(useCasesTable)
+      .where(eq(useCasesTable.id, id))
+      .limit(1)
     if (!useCase) {
       return { isSuccess: false, message: "Use case not found" }
     }

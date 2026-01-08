@@ -13,6 +13,9 @@ export async function createDependencyAction(
   dependency: InsertDependency
 ): Promise<ActionState<SelectDependency>> {
   try {
+    if (!db) {
+      return { isSuccess: false, message: "Database not available" }
+    }
     const [newDependency] = await db
       .insert(dependenciesTable)
       .values(dependency)
@@ -32,7 +35,10 @@ export async function getDependenciesAction(): Promise<
   ActionState<SelectDependency[]>
 > {
   try {
-    const dependencies = await db.query.dependencies.findMany()
+    if (!db) {
+      return { isSuccess: false, message: "Database not available" }
+    }
+    const dependencies = await db.select().from(dependenciesTable)
     return {
       isSuccess: true,
       message: "Dependencies retrieved successfully",
@@ -48,12 +54,18 @@ export async function getDependenciesByUseCaseIdAction(
   useCaseId: string
 ): Promise<ActionState<SelectDependency[]>> {
   try {
-    const dependencies = await db.query.dependencies.findMany({
-      where: or(
-        eq(dependenciesTable.fromUseCaseId, useCaseId),
-        eq(dependenciesTable.toUseCaseId, useCaseId)
+    if (!db) {
+      return { isSuccess: false, message: "Database not available" }
+    }
+    const dependencies = await db
+      .select()
+      .from(dependenciesTable)
+      .where(
+        or(
+          eq(dependenciesTable.fromUseCaseId, useCaseId),
+          eq(dependenciesTable.toUseCaseId, useCaseId)
+        )
       )
-    })
     return {
       isSuccess: true,
       message: "Dependencies retrieved successfully",
@@ -71,6 +83,9 @@ export async function deleteDependencyAction(
   type: string
 ): Promise<ActionState<void>> {
   try {
+    if (!db) {
+      return { isSuccess: false, message: "Database not available" }
+    }
     await db
       .delete(dependenciesTable)
       .where(

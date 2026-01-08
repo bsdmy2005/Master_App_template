@@ -1,7 +1,8 @@
 "use client"
 
 import { useMemo } from "react"
-import type { PlanningData, UseCaseTimeline } from "@/types/planning-types"
+import type { PlanningData } from "@/types/planning-types"
+import type { UseCaseTimeline } from "@/lib/timeline-calculator"
 import { calculateDatePosition } from "@/lib/timeline-scale"
 import { isWeekend } from "@/lib/working-days"
 import type { TimeScale } from "@/types/planning-types"

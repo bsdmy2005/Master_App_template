@@ -9,6 +9,9 @@ export async function createClientAction(
   client: InsertClient
 ): Promise<ActionState<SelectClient>> {
   try {
+    if (!db) {
+      return { isSuccess: false, message: "Database not available" }
+    }
     const [newClient] = await db.insert(clientsTable).values(client).returning()
     return {
       isSuccess: true,
@@ -23,6 +26,9 @@ export async function createClientAction(
 
 export async function getClientsAction(): Promise<ActionState<SelectClient[]>> {
   try {
+    if (!db) {
+      return { isSuccess: false, message: "Database not available" }
+    }
     const clients = await db.select().from(clientsTable)
     return {
       isSuccess: true,
@@ -40,6 +46,9 @@ export async function updateClientAction(
   data: Partial<InsertClient>
 ): Promise<ActionState<SelectClient>> {
   try {
+    if (!db) {
+      return { isSuccess: false, message: "Database not available" }
+    }
     const [updatedClient] = await db
       .update(clientsTable)
       .set({ ...data, updatedAt: new Date() })
@@ -59,6 +68,9 @@ export async function updateClientAction(
 
 export async function deleteClientAction(id: string): Promise<ActionState<void>> {
   try {
+    if (!db) {
+      return { isSuccess: false, message: "Database not available" }
+    }
     await db.delete(clientsTable).where(eq(clientsTable.id, id))
     return {
       isSuccess: true,
