@@ -307,6 +307,150 @@ export function EstimationGuide() {
         </CardContent>
       </Card>
 
+      {/* Step 4: Overlapping Periods */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 text-orange-700 text-sm font-bold">4</span>
+            Overlapping Periods & Variable Velocity
+          </CardTitle>
+          <CardDescription>
+            When tasks overlap, velocity changes dynamically. This is a <strong>Resource-Constrained Project Scheduling Problem (RCPSP)</strong>.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Problem explanation */}
+          <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 p-4">
+            <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+            <div className="text-sm space-y-2">
+              <div><strong>The Problem:</strong> When multiple tasks share developers and overlap in time, the velocity for each task isn't constant—it varies based on what else is active at any given moment.</div>
+              <div><strong>The Solution:</strong> We use <em>Segment-Based Scheduling</em> to break the timeline into windows where concurrency is constant, then calculate work done in each segment.</div>
+            </div>
+          </div>
+
+          {/* Visual example */}
+          <div className="space-y-3">
+            <h4 className="font-medium">Example: Two Overlapping Tasks</h4>
+            <div className="rounded-lg border p-4 space-y-4">
+              <div className="text-sm text-muted-foreground">
+                <strong>Scenario:</strong> Task A (40 man-days) starts Jan 1, Task B (40 man-days) starts Jan 15. Both share the same developer (40 hrs/week = 1.0 man-days/day).
+              </div>
+
+              {/* Timeline visualization */}
+              <div className="space-y-3">
+                <div className="relative">
+                  <div className="text-xs text-muted-foreground mb-1">Task A</div>
+                  <div className="flex h-8 rounded overflow-hidden">
+                    <div className="bg-blue-500 flex items-center justify-center text-white text-xs px-2" style={{ width: "25%" }}>
+                      Seg 1
+                    </div>
+                    <div className="bg-blue-300 flex items-center justify-center text-blue-900 text-xs px-2" style={{ width: "50%" }}>
+                      Seg 2 (shared)
+                    </div>
+                  </div>
+                </div>
+                <div className="relative">
+                  <div className="text-xs text-muted-foreground mb-1">Task B</div>
+                  <div className="flex h-8 rounded overflow-hidden">
+                    <div className="bg-transparent" style={{ width: "25%" }} />
+                    <div className="bg-green-300 flex items-center justify-center text-green-900 text-xs px-2" style={{ width: "50%" }}>
+                      Seg 2 (shared)
+                    </div>
+                    <div className="bg-green-500 flex items-center justify-center text-white text-xs px-2" style={{ width: "25%" }}>
+                      Seg 3
+                    </div>
+                  </div>
+                </div>
+                <div className="flex text-xs text-muted-foreground">
+                  <div style={{ width: "25%" }}>Jan 1</div>
+                  <div style={{ width: "25%" }}>Jan 15</div>
+                  <div style={{ width: "25%" }}>Task A ends</div>
+                  <div style={{ width: "25%" }} className="text-right">Task B ends</div>
+                </div>
+              </div>
+
+              {/* Segment breakdown */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                <div className="p-3 rounded bg-blue-100 dark:bg-blue-900/30">
+                  <div className="font-medium text-blue-700 dark:text-blue-300">Segment 1</div>
+                  <div className="text-xs space-y-1 mt-2">
+                    <div>Jan 1–14 (10 working days)</div>
+                    <div>Only Task A active</div>
+                    <div className="font-medium">Velocity: 1.0 man-days/day</div>
+                    <div>Work: 10 man-days for A</div>
+                  </div>
+                </div>
+                <div className="p-3 rounded bg-amber-100 dark:bg-amber-900/30">
+                  <div className="font-medium text-amber-700 dark:text-amber-300">Segment 2</div>
+                  <div className="text-xs space-y-1 mt-2">
+                    <div>Jan 15 – Task A ends</div>
+                    <div>Both tasks active (shared dev)</div>
+                    <div className="font-medium">Velocity: 0.5 each</div>
+                    <div>A needs 30 more @ 0.5 = 60 days</div>
+                  </div>
+                </div>
+                <div className="p-3 rounded bg-green-100 dark:bg-green-900/30">
+                  <div className="font-medium text-green-700 dark:text-green-300">Segment 3</div>
+                  <div className="text-xs space-y-1 mt-2">
+                    <div>After Task A completes</div>
+                    <div>Only Task B active</div>
+                    <div className="font-medium">Velocity: 1.0 man-days/day</div>
+                    <div>B finishes remaining work faster</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Algorithm description */}
+          <div className="space-y-3">
+            <h4 className="font-medium">How the Algorithm Works</h4>
+            <ol className="space-y-2 text-sm">
+              <li className="flex gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold">1</span>
+                <span><strong>Identify Change Points:</strong> Collect all task start and end dates—these are points where concurrency might change.</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold">2</span>
+                <span><strong>Create Segments:</strong> Break the timeline into segments between change points where concurrency is constant.</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold">3</span>
+                <span><strong>Calculate Per-Segment:</strong> For each segment, determine which tasks are active and calculate the effective velocity for each.</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold">4</span>
+                <span><strong>Accumulate Work:</strong> Track how much work is completed in each segment until the task's man-days requirement is met.</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold">5</span>
+                <span><strong>Iterate to Convergence:</strong> Since end dates affect other tasks' segments, repeat until all timelines stabilize.</span>
+              </li>
+            </ol>
+          </div>
+
+          {/* Formula box */}
+          <div className="rounded-lg bg-slate-100 dark:bg-slate-800 p-4 space-y-2">
+            <div className="text-center font-mono text-sm">
+              <span className="text-orange-600">Work in Segment</span> = Segment Working Days × Effective Velocity
+            </div>
+            <div className="text-center font-mono text-sm">
+              <span className="text-orange-600">End Date</span> = When Σ(Segment Work) ≥ Total Man-Days
+            </div>
+          </div>
+
+          {/* Key insight */}
+          <div className="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/20 p-4">
+            <Zap className="h-5 w-5 text-green-600 mt-0.5" />
+            <div className="text-sm">
+              <strong>Result:</strong> Tasks that start earlier get more solo work done before sharing resources,
+              so they finish sooner. When one task completes, remaining tasks speed up as developers are freed.
+              The Gantt chart reflects these dynamics automatically.
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Interactive Calculator */}
       <Card className="border-2 border-primary/20">
         <CardHeader>
