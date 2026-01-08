@@ -32,7 +32,8 @@ import {
   ChevronLeft,
   GripVertical,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Loader2
 } from "lucide-react"
 import type { PlanningData, TimeScale, GanttFilters } from "@/types/planning-types"
 import { calculateTimelines, type UseCaseTimeline } from "@/lib/timeline-calculator"
@@ -461,6 +462,9 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
   // Full-screen mode
   const [isFullScreen, setIsFullScreen] = useState(false)
 
+  // Recalculating state - shows visual feedback during timeline recalculation
+  const [isRecalculating, setIsRecalculating] = useState(false)
+
   // Refs
   const timelineRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLDivElement>(null)
@@ -583,9 +587,14 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
       groups.get(client.id)!.items.push({ timeline, useCase })
     }
 
-    // Sort items within each group by start date
+    // Sort items within each group by their original order in data.useCases (stable order)
+    // This prevents reordering when start dates change during drag-and-drop
     for (const group of groups.values()) {
-      group.items.sort((a, b) => a.timeline.startDate.getTime() - b.timeline.startDate.getTime())
+      group.items.sort((a, b) => {
+        const indexA = data.useCases.findIndex((uc) => uc.id === a.useCase.id)
+        const indexB = data.useCases.findIndex((uc) => uc.id === b.useCase.id)
+        return indexA - indexB
+      })
     }
 
     return groups
@@ -786,6 +795,14 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
         return
       }
 
+      // Show recalculating state before updating
+      setIsRecalculating(true)
+      setDragState(null)
+      document.body.style.cursor = ""
+
+      // Small delay to show the recalculating state
+      await new Promise(resolve => setTimeout(resolve, 50))
+
       // Update the use case with new start date
       const updatedUseCases = data.useCases.map((uc) =>
         uc.id === dragState.useCaseId
@@ -801,6 +818,10 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
       // Update local state
       setData(updatedData)
 
+      // Brief delay to let React settle the new state, then reveal
+      await new Promise(resolve => setTimeout(resolve, 150))
+      setIsRecalculating(false)
+
       // Persist to storage
       try {
         await writePlanningDataWithFallback(updatedData)
@@ -811,9 +832,6 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
         console.error("Failed to save:", error)
         toast.error("Failed to save changes")
       }
-
-      setDragState(null)
-      document.body.style.cursor = ""
     },
     [dragState, pixelsPerDay, timelineStart, data, setData]
   )
@@ -881,7 +899,15 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
           {/* Left: Title and scale */}
           <div className="flex items-center gap-4">
             <div>
-              <h2 className="text-lg font-semibold">Project Timeline</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">Project Timeline</h2>
+                {isRecalculating && (
+                  <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-2 py-1 rounded-full">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span>Calculating...</span>
+                  </div>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
                 {filteredTimelines.length} use cases across {groupedTimelines.size} clients
               </p>
@@ -1301,21 +1327,24 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
                                 <TooltipTrigger asChild>
                                   <div
                                     className={cn(
-                                      "absolute top-1/2 -translate-y-1/2 rounded transition-all",
-                                      canDrag ? "cursor-grab hover:scale-[1.02] hover:shadow-lg" : "cursor-pointer",
+                                      "absolute top-1/2 -translate-y-1/2 rounded border",
+                                      // Recalculating state - subtle pulse animation
+                                      isRecalculating
+                                        ? "animate-pulse opacity-60 pointer-events-none"
+                                        : "transition-all duration-300 ease-out",
+                                      !isRecalculating && canDrag && "cursor-grab hover:scale-[1.02] hover:shadow-lg",
                                       isDragging && "cursor-grabbing shadow-xl scale-105 z-50 ring-2 ring-primary",
                                       statusStyle.bg,
                                       statusStyle.border,
                                       priorityStyle,
-                                      hasConflict && !isDragging && "ring-2 ring-yellow-400 ring-offset-1",
-                                      "border"
+                                      hasConflict && !isDragging && !isRecalculating && "ring-2 ring-yellow-400 ring-offset-1"
                                     )}
                                     style={{
                                       left,
                                       width,
                                       height: ROW_HEIGHT - 12
                                     }}
-                                    onMouseDown={(e) => canDrag && handleDragStart(useCase.id, e)}
+                                    onMouseDown={(e) => canDrag && !isRecalculating && handleDragStart(useCase.id, e)}
                                   >
                                     {/* Drag handle indicator */}
                                     {canDrag && (
