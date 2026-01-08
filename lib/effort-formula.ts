@@ -102,42 +102,4 @@ export function getComplexityWeight(complexity: Complexity, config: EffortConfig
   return config.complexityWeights[complexity]
 }
 
-// Storage key for effort config
-export const EFFORT_CONFIG_KEY = "effort-config"
-
-// Load effort config from localStorage
-export function loadEffortConfig(): EffortConfig {
-  if (typeof window === "undefined") return defaultEffortConfig
-
-  try {
-    const stored = localStorage.getItem(EFFORT_CONFIG_KEY)
-    if (stored) {
-      const parsed = JSON.parse(stored)
-      // Merge with defaults to ensure all fields exist
-      return {
-        complexityWeights: { ...defaultComplexityWeights, ...parsed.complexityWeights },
-        gapWeights: { ...defaultGapWeights, ...parsed.gapWeights },
-        formulaParams: {
-          low: { ...defaultFormulaConfig.low, ...parsed.formulaParams?.low },
-          medium: { ...defaultFormulaConfig.medium, ...parsed.formulaParams?.medium },
-          high: { ...defaultFormulaConfig.high, ...parsed.formulaParams?.high }
-        }
-      }
-    }
-  } catch (error) {
-    console.error("Error loading effort config:", error)
-  }
-
-  return defaultEffortConfig
-}
-
-// Save effort config to localStorage
-export function saveEffortConfig(config: EffortConfig): void {
-  if (typeof window === "undefined") return
-
-  try {
-    localStorage.setItem(EFFORT_CONFIG_KEY, JSON.stringify(config))
-  } catch (error) {
-    console.error("Error saving effort config:", error)
-  }
-}
+// Note: Effort configuration persistence is now handled via the database

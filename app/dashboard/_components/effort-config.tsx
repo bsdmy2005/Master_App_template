@@ -25,8 +25,6 @@ import {
   defaultEffortConfig,
   complexityLabels,
   gapLevelLabels,
-  loadEffortConfig,
-  saveEffortConfig,
   calculateManDays
 } from "@/lib/effort-formula"
 import { useEffortConfig } from "@/lib/effort-config-context"
@@ -142,7 +140,7 @@ export function EffortConfig({ data, setData }: EffortConfigProps) {
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      // Save config to localStorage and context
+      // Save config to database via context
       saveContextConfig(config)
 
       // Recalculate all use cases with new config

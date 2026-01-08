@@ -1,6 +1,6 @@
-# Black Glass Project Management Dashboard
+# Black Glass Use Case Manager
 
-A modern, responsive project management dashboard for managing Black Glass use cases across multiple clients.
+A modern, responsive use case management dashboard for managing Black Glass use cases across multiple clients.
 
 ## Features
 

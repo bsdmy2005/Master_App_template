@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Black Glass Project Management",
-  description: "Project management dashboard for Black Glass use cases"
+  title: "Black Glass Use Case Manager",
+  description: "Use case planning and management dashboard for Black Glass"
 }
 
 export default function RootLayout({

@@ -49,7 +49,7 @@ export function DashboardSidebar({
       <div className="flex h-full flex-col p-4">
         <div className="mb-6">
           <h1 className="text-xl font-bold">Black Glass</h1>
-          <p className="text-sm text-muted-foreground">Project Management</p>
+          <p className="text-sm text-muted-foreground">Use Case Manager</p>
         </div>
         <nav className="flex-1 space-y-1">
           {navigation.map((item) => {

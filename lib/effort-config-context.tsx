@@ -2,12 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
 import type { EffortConfig, PlanningData, UseCase } from "@/types/planning-types"
-import {
-  defaultEffortConfig,
-  loadEffortConfig,
-  saveEffortConfig,
-  calculateManDays
-} from "./effort-formula"
+import { defaultEffortConfig, calculateManDays } from "@/lib/effort-formula"
 
 interface EffortConfigContextType {
   config: EffortConfig
@@ -22,16 +17,48 @@ const EffortConfigContext = createContext<EffortConfigContextType | null>(null)
 export function EffortConfigProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<EffortConfig>(defaultEffortConfig)
 
-  // Load saved config on mount
+  // Load saved config from database on mount
   useEffect(() => {
-    const loaded = loadEffortConfig()
-    setConfig(loaded)
+    let cancelled = false
+
+    const load = async () => {
+      try {
+        const { getEffortConfigAction } = await import("@/actions/db/effort-config-actions")
+        const result = await getEffortConfigAction()
+        if (!cancelled && result.isSuccess && result.data) {
+          setConfig(result.data)
+        }
+      } catch (error) {
+        console.error("Failed to load effort config from database, using defaults:", error)
+        // Fallback: keep defaultEffortConfig
+      }
+    }
+
+    load()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  // Save config and update state
+  // Save config to database and update state
   const saveConfig = useCallback((newConfig: EffortConfig) => {
-    saveEffortConfig(newConfig)
+    const persist = async () => {
+      try {
+        const { saveEffortConfigAction } = await import("@/actions/db/effort-config-actions")
+        const result = await saveEffortConfigAction(newConfig)
+        if (result.isSuccess) {
+          setConfig(newConfig)
+        } else {
+          console.error("Failed to save effort config:", result.message)
+        }
+      } catch (error) {
+        console.error("Error saving effort config to database:", error)
+      }
+    }
+
     setConfig(newConfig)
+    void persist()
   }, [])
 
   // Calculate effort using current config
