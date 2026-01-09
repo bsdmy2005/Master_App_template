@@ -42,47 +42,103 @@ export function DeveloperRepository({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const now = new Date().toISOString()
-    let updatedDevelopers: Developer[]
+    const { checkDatabaseAvailableAction } = await import("@/actions/db/db-actions")
+    const { createDeveloperAction, updateDeveloperAction } = await import("@/actions/db/developers-actions")
 
-    if (editingDeveloper) {
-      updatedDevelopers = data.developers.map((dev) =>
-        dev.id === editingDeveloper.id
-          ? {
-              ...dev,
-              ...formData,
-              updatedAt: now
-            }
-          : dev
-      )
-    } else {
-      const newDeveloper: Developer = {
-        id: `dev-${Date.now()}`,
-        ...formData,
-        createdAt: now,
-        updatedAt: now
+    const dbAvailable = await checkDatabaseAvailableAction()
+
+    if (dbAvailable) {
+      if (editingDeveloper) {
+        // Update existing developer
+        const result = await updateDeveloperAction(editingDeveloper.id, formData)
+        if (result.isSuccess && result.data) {
+          const updatedDeveloper: Developer = {
+            id: result.data.id,
+            name: result.data.name,
+            email: result.data.email,
+            capacity: result.data.capacity,
+            createdAt: result.data.createdAt.toISOString(),
+            updatedAt: result.data.updatedAt.toISOString()
+          }
+          const updatedDevelopers = data.developers.map((dev) =>
+            dev.id === editingDeveloper.id ? updatedDeveloper : dev
+          )
+          setData({ ...data, developers: updatedDevelopers })
+          setIsDialogOpen(false)
+          setEditingDeveloper(null)
+          setFormData({ name: "", email: "", capacity: 40 })
+          toast.success("Developer updated successfully")
+        } else {
+          toast.error("Failed to update developer: " + result.message)
+        }
+      } else {
+        // Create new developer
+        const developerData = {
+          id: `dev-${Date.now()}`,
+          ...formData
+        }
+        const result = await createDeveloperAction(developerData)
+        if (result.isSuccess && result.data) {
+          const newDeveloper: Developer = {
+            id: result.data.id,
+            name: result.data.name,
+            email: result.data.email,
+            capacity: result.data.capacity,
+            createdAt: result.data.createdAt.toISOString(),
+            updatedAt: result.data.updatedAt.toISOString()
+          }
+          setData({ ...data, developers: [...data.developers, newDeveloper] })
+          setIsDialogOpen(false)
+          setFormData({ name: "", email: "", capacity: 40 })
+          toast.success("Developer added successfully")
+        } else {
+          toast.error("Failed to create developer: " + result.message)
+        }
       }
-      updatedDevelopers = [...data.developers, newDeveloper]
-    }
-
-    const updatedData: PlanningData = {
-      ...data,
-      developers: updatedDevelopers
-    }
-
-    const result = await writePlanningDataWithFallback(updatedData)
-    if (result.success) {
-      setData(updatedData)
-      setIsDialogOpen(false)
-      setEditingDeveloper(null)
-      setFormData({ name: "", email: "", capacity: 40 })
-      toast.success(
-        editingDeveloper
-          ? "Developer updated successfully"
-          : "Developer added successfully"
-      )
     } else {
-      toast.error("Failed to save developer")
+      // Fallback to file system
+      const now = new Date().toISOString()
+      let updatedDevelopers: Developer[]
+
+      if (editingDeveloper) {
+        updatedDevelopers = data.developers.map((dev) =>
+          dev.id === editingDeveloper.id
+            ? {
+                ...dev,
+                ...formData,
+                updatedAt: now
+              }
+            : dev
+        )
+      } else {
+        const newDeveloper: Developer = {
+          id: `dev-${Date.now()}`,
+          ...formData,
+          createdAt: now,
+          updatedAt: now
+        }
+        updatedDevelopers = [...data.developers, newDeveloper]
+      }
+
+      const updatedData: PlanningData = {
+        ...data,
+        developers: updatedDevelopers
+      }
+
+      const result = await writePlanningDataWithFallback(updatedData)
+      if (result.success) {
+        setData(updatedData)
+        setIsDialogOpen(false)
+        setEditingDeveloper(null)
+        setFormData({ name: "", email: "", capacity: 40 })
+        toast.success(
+          editingDeveloper
+            ? "Developer updated successfully (file system)"
+            : "Developer added successfully (file system)"
+        )
+      } else {
+        toast.error("Failed to save developer")
+      }
     }
   }
 
@@ -99,18 +155,35 @@ export function DeveloperRepository({
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this developer?")) return
 
-    const updatedDevelopers = data.developers.filter((dev) => dev.id !== id)
-    const updatedData: PlanningData = {
-      ...data,
-      developers: updatedDevelopers
-    }
+    const { checkDatabaseAvailableAction } = await import("@/actions/db/db-actions")
+    const { deleteDeveloperAction } = await import("@/actions/db/developers-actions")
 
-    const result = await writePlanningDataWithFallback(updatedData)
-    if (result.success) {
-      setData(updatedData)
-      toast.success("Developer deleted successfully")
+    const dbAvailable = await checkDatabaseAvailableAction()
+
+    if (dbAvailable) {
+      const result = await deleteDeveloperAction(id)
+      if (result.isSuccess) {
+        const updatedDevelopers = data.developers.filter((dev) => dev.id !== id)
+        setData({ ...data, developers: updatedDevelopers })
+        toast.success("Developer deleted successfully")
+      } else {
+        toast.error("Failed to delete developer: " + result.message)
+      }
     } else {
-      toast.error("Failed to delete developer")
+      // Fallback to file system
+      const updatedDevelopers = data.developers.filter((dev) => dev.id !== id)
+      const updatedData: PlanningData = {
+        ...data,
+        developers: updatedDevelopers
+      }
+
+      const result = await writePlanningDataWithFallback(updatedData)
+      if (result.success) {
+        setData(updatedData)
+        toast.success("Developer deleted successfully (file system)")
+      } else {
+        toast.error("Failed to delete developer")
+      }
     }
   }
 

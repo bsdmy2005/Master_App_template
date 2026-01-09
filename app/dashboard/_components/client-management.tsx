@@ -281,84 +281,279 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
   const handleUseCaseSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    const { checkDatabaseAvailableAction } = await import("@/actions/db/db-actions")
+    const { createUseCaseAction, updateUseCaseAction } = await import("@/actions/db/use-cases-actions")
+    const { createTaskAction, updateTaskAction, deleteTaskAction } = await import("@/actions/db/tasks-actions")
+
+    const dbAvailable = await checkDatabaseAvailableAction()
+
     const manDays = calculateEffort(
       useCaseFormData.complexity,
       useCaseFormData.gap
     )
 
     const now = new Date().toISOString()
-    let updatedUseCases: UseCase[]
-    let useCaseId: string
 
-    if (editingUseCase) {
-      useCaseId = editingUseCase.id
-      updatedUseCases = data.useCases.map((uc) =>
-        uc.id === editingUseCase.id
-          ? {
-              ...uc,
-              ...useCaseFormData,
-              manDays,
-              updatedAt: now
+    if (dbAvailable) {
+      if (editingUseCase) {
+        // Update existing use case
+        const useCaseData = {
+          ...useCaseFormData,
+          manDays,
+          startDate: useCaseFormData.startDate ? new Date(useCaseFormData.startDate) : null
+        }
+        const result = await updateUseCaseAction(editingUseCase.id, useCaseData)
+
+        if (result.isSuccess && result.data) {
+          // Update local state
+          const updatedUseCase: UseCase = {
+            id: result.data.id,
+            clientId: result.data.clientId,
+            useCaseId: result.data.useCaseId,
+            title: result.data.title,
+            description: result.data.description || undefined,
+            keyAcceptanceCriteria: result.data.keyAcceptanceCriteria || undefined,
+            complexity: result.data.complexity,
+            gap: result.data.gap,
+            manDays: result.data.manDays,
+            sdkGaps: result.data.sdkGaps || undefined,
+            status: result.data.status,
+            priority: result.data.priority,
+            startDate: result.data.startDate?.toISOString(),
+            assignedDeveloperIds: result.data.assignedDeveloperIds || undefined,
+            createdAt: result.data.createdAt.toISOString(),
+            updatedAt: result.data.updatedAt.toISOString()
+          }
+
+          // Handle tasks: delete old tasks and create new ones
+          const oldTasks = data.tasks.filter((t) => t.useCaseId === editingUseCase.id)
+          for (const oldTask of oldTasks) {
+            await deleteTaskAction(oldTask.id)
+          }
+
+          // Create new tasks
+          const createdTasks: Task[] = []
+          for (const task of useCaseTasks) {
+            const taskData = {
+              id: task.id.startsWith("task-") ? task.id : `task-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+              useCaseId: editingUseCase.id,
+              title: task.title,
+              description: task.description || null,
+              estimatedHours: task.estimatedHours,
+              assignedDeveloperIds: task.assignedDeveloperIds,
+              status: task.status,
+              dependencies: task.dependencies
             }
-          : uc
-      )
-    } else {
-      useCaseId = `usecase-${Date.now()}`
-      const newUseCase: UseCase = {
-        id: useCaseId,
-        ...useCaseFormData,
-        manDays,
-        createdAt: now,
-        updatedAt: now
+            const taskResult = await createTaskAction(taskData)
+            if (taskResult.isSuccess && taskResult.data) {
+              createdTasks.push({
+                id: taskResult.data.id,
+                useCaseId: taskResult.data.useCaseId,
+                title: taskResult.data.title,
+                description: taskResult.data.description || undefined,
+                estimatedHours: taskResult.data.estimatedHours,
+                assignedDeveloperIds: taskResult.data.assignedDeveloperIds || [],
+                status: taskResult.data.status,
+                dependencies: taskResult.data.dependencies || [],
+                createdAt: taskResult.data.createdAt.toISOString(),
+                updatedAt: taskResult.data.updatedAt.toISOString()
+              })
+            }
+          }
+
+          const updatedUseCases = data.useCases.map((uc) =>
+            uc.id === editingUseCase.id ? updatedUseCase : uc
+          )
+          const existingTasks = data.tasks.filter((t) => t.useCaseId !== editingUseCase.id)
+
+          setData({
+            ...data,
+            useCases: updatedUseCases,
+            tasks: [...existingTasks, ...createdTasks]
+          })
+          setIsUseCaseDialogOpen(false)
+          setEditingUseCase(null)
+          setUseCaseTasks([])
+          setUseCaseFormData({
+            clientId: "",
+            useCaseId: "",
+            title: "",
+            description: "",
+            keyAcceptanceCriteria: "",
+            complexity: "medium",
+            gap: "moderate-extension" as GapLevel,
+            sdkGaps: "",
+            status: "high-level definition",
+            priority: "medium" as Priority,
+            startDate: "",
+            assignedDeveloperIds: []
+          })
+          toast.success("Use case updated successfully")
+        } else {
+          toast.error("Failed to update use case: " + result.message)
+        }
+      } else {
+        // Create new use case
+        const useCaseId = `usecase-${Date.now()}`
+        const useCaseData = {
+          id: useCaseId,
+          ...useCaseFormData,
+          manDays,
+          startDate: useCaseFormData.startDate ? new Date(useCaseFormData.startDate) : null
+        }
+        const result = await createUseCaseAction(useCaseData)
+
+        if (result.isSuccess && result.data) {
+          const newUseCase: UseCase = {
+            id: result.data.id,
+            clientId: result.data.clientId,
+            useCaseId: result.data.useCaseId,
+            title: result.data.title,
+            description: result.data.description || undefined,
+            keyAcceptanceCriteria: result.data.keyAcceptanceCriteria || undefined,
+            complexity: result.data.complexity,
+            gap: result.data.gap,
+            manDays: result.data.manDays,
+            sdkGaps: result.data.sdkGaps || undefined,
+            status: result.data.status,
+            priority: result.data.priority,
+            startDate: result.data.startDate?.toISOString(),
+            assignedDeveloperIds: result.data.assignedDeveloperIds || undefined,
+            createdAt: result.data.createdAt.toISOString(),
+            updatedAt: result.data.updatedAt.toISOString()
+          }
+
+          // Create tasks for the new use case
+          const createdTasks: Task[] = []
+          for (const task of useCaseTasks) {
+            const taskData = {
+              id: `task-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+              useCaseId: useCaseId,
+              title: task.title,
+              description: task.description || null,
+              estimatedHours: task.estimatedHours,
+              assignedDeveloperIds: task.assignedDeveloperIds,
+              status: task.status,
+              dependencies: task.dependencies
+            }
+            const taskResult = await createTaskAction(taskData)
+            if (taskResult.isSuccess && taskResult.data) {
+              createdTasks.push({
+                id: taskResult.data.id,
+                useCaseId: taskResult.data.useCaseId,
+                title: taskResult.data.title,
+                description: taskResult.data.description || undefined,
+                estimatedHours: taskResult.data.estimatedHours,
+                assignedDeveloperIds: taskResult.data.assignedDeveloperIds || [],
+                status: taskResult.data.status,
+                dependencies: taskResult.data.dependencies || [],
+                createdAt: taskResult.data.createdAt.toISOString(),
+                updatedAt: taskResult.data.updatedAt.toISOString()
+              })
+            }
+          }
+
+          setData({
+            ...data,
+            useCases: [...data.useCases, newUseCase],
+            tasks: [...data.tasks, ...createdTasks]
+          })
+          setIsUseCaseDialogOpen(false)
+          setUseCaseTasks([])
+          setUseCaseFormData({
+            clientId: "",
+            useCaseId: "",
+            title: "",
+            description: "",
+            keyAcceptanceCriteria: "",
+            complexity: "medium",
+            gap: "moderate-extension" as GapLevel,
+            sdkGaps: "",
+            status: "high-level definition",
+            priority: "medium" as Priority,
+            startDate: "",
+            assignedDeveloperIds: []
+          })
+          toast.success("Use case added successfully")
+        } else {
+          toast.error("Failed to create use case: " + result.message)
+        }
       }
-      updatedUseCases = [...data.useCases, newUseCase]
-    }
-
-    // Update tasks with the use case ID
-    const updatedTasks = useCaseTasks.map((task) => ({
-      ...task,
-      useCaseId,
-      updatedAt: now
-    }))
-
-    // Remove old tasks for this use case if editing
-    const existingTasks = editingUseCase
-      ? data.tasks.filter((t) => t.useCaseId !== editingUseCase.id)
-      : data.tasks
-
-    const updatedData: PlanningData = {
-      ...data,
-      useCases: updatedUseCases,
-      tasks: [...existingTasks, ...updatedTasks]
-    }
-
-    const result = await writePlanningDataWithFallback(updatedData)
-    if (result.success) {
-      setData(updatedData)
-      setIsUseCaseDialogOpen(false)
-      setEditingUseCase(null)
-      setUseCaseTasks([])
-      setUseCaseFormData({
-        clientId: "",
-        useCaseId: "",
-        title: "",
-        description: "",
-        keyAcceptanceCriteria: "",
-        complexity: "medium",
-        gap: "moderate-extension" as GapLevel,
-        sdkGaps: "",
-        status: "high-level definition",
-        priority: "medium" as Priority,
-        startDate: "",
-        assignedDeveloperIds: []
-      })
-      toast.success(
-        editingUseCase
-          ? "Use case updated successfully"
-          : "Use case added successfully"
-      )
     } else {
-      toast.error("Failed to save use case")
+      // Fallback to file system
+      let updatedUseCases: UseCase[]
+      let useCaseId: string
+
+      if (editingUseCase) {
+        useCaseId = editingUseCase.id
+        updatedUseCases = data.useCases.map((uc) =>
+          uc.id === editingUseCase.id
+            ? {
+                ...uc,
+                ...useCaseFormData,
+                manDays,
+                updatedAt: now
+              }
+            : uc
+        )
+      } else {
+        useCaseId = `usecase-${Date.now()}`
+        const newUseCase: UseCase = {
+          id: useCaseId,
+          ...useCaseFormData,
+          manDays,
+          createdAt: now,
+          updatedAt: now
+        }
+        updatedUseCases = [...data.useCases, newUseCase]
+      }
+
+      // Update tasks with the use case ID
+      const updatedTasks = useCaseTasks.map((task) => ({
+        ...task,
+        useCaseId,
+        updatedAt: now
+      }))
+
+      // Remove old tasks for this use case if editing
+      const existingTasks = editingUseCase
+        ? data.tasks.filter((t) => t.useCaseId !== editingUseCase.id)
+        : data.tasks
+
+      const updatedData: PlanningData = {
+        ...data,
+        useCases: updatedUseCases,
+        tasks: [...existingTasks, ...updatedTasks]
+      }
+
+      const result = await writePlanningDataWithFallback(updatedData)
+      if (result.success) {
+        setData(updatedData)
+        setIsUseCaseDialogOpen(false)
+        setEditingUseCase(null)
+        setUseCaseTasks([])
+        setUseCaseFormData({
+          clientId: "",
+          useCaseId: "",
+          title: "",
+          description: "",
+          keyAcceptanceCriteria: "",
+          complexity: "medium",
+          gap: "moderate-extension" as GapLevel,
+          sdkGaps: "",
+          status: "high-level definition",
+          priority: "medium" as Priority,
+          startDate: "",
+          assignedDeveloperIds: []
+        })
+        toast.success(
+          editingUseCase
+            ? "Use case updated successfully (file system)"
+            : "Use case added successfully (file system)"
+        )
+      } else {
+        toast.error("Failed to save use case")
+      }
     }
   }
 
@@ -634,24 +829,52 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
     )
     if (!confirmed) return
 
-    const now = new Date().toISOString()
-    const updatedUseCases = data.useCases.map((uc) => ({
-      ...uc,
-      startDate: undefined,
-      updatedAt: now
-    }))
+    const { checkDatabaseAvailableAction } = await import("@/actions/db/db-actions")
+    const { updateUseCaseAction } = await import("@/actions/db/use-cases-actions")
 
-    const updatedData: PlanningData = {
-      ...data,
-      useCases: updatedUseCases
-    }
+    const dbAvailable = await checkDatabaseAvailableAction()
 
-    const result = await writePlanningDataWithFallback(updatedData)
-    if (result.success) {
-      setData(updatedData)
-      toast.success(`Reset start dates for ${useCasesWithDates.length} use case(s)`)
+    if (dbAvailable) {
+      // Update each use case with start date in database
+      let successCount = 0
+      for (const uc of useCasesWithDates) {
+        const result = await updateUseCaseAction(uc.id, { startDate: null })
+        if (result.isSuccess) {
+          successCount++
+        }
+      }
+
+      // Update local state
+      const now = new Date().toISOString()
+      const updatedUseCases = data.useCases.map((uc) => ({
+        ...uc,
+        startDate: undefined,
+        updatedAt: now
+      }))
+
+      setData({ ...data, useCases: updatedUseCases })
+      toast.success(`Reset start dates for ${successCount} use case(s)`)
     } else {
-      toast.error("Failed to reset start dates")
+      // Fallback to file system
+      const now = new Date().toISOString()
+      const updatedUseCases = data.useCases.map((uc) => ({
+        ...uc,
+        startDate: undefined,
+        updatedAt: now
+      }))
+
+      const updatedData: PlanningData = {
+        ...data,
+        useCases: updatedUseCases
+      }
+
+      const result = await writePlanningDataWithFallback(updatedData)
+      if (result.success) {
+        setData(updatedData)
+        toast.success(`Reset start dates for ${useCasesWithDates.length} use case(s) (file system)`)
+      } else {
+        toast.error("Failed to reset start dates")
+      }
     }
   }
 
@@ -659,67 +882,162 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
     taskId: string,
     updates: Partial<Task>
   ) => {
-    const now = new Date().toISOString()
-    const updatedTasks = data.tasks.map((task) =>
-      task.id === taskId
-        ? { ...task, ...updates, updatedAt: now }
-        : task
-    )
+    const { checkDatabaseAvailableAction } = await import("@/actions/db/db-actions")
+    const { updateTaskAction } = await import("@/actions/db/tasks-actions")
 
-    const updatedData: PlanningData = {
-      ...data,
-      tasks: updatedTasks
-    }
+    const dbAvailable = await checkDatabaseAvailableAction()
 
-    const result = await writePlanningDataWithFallback(updatedData)
-    if (result.success) {
-      setData(updatedData)
-      toast.success("Task updated successfully")
+    if (dbAvailable) {
+      // Convert updates to database format
+      const dbUpdates: Record<string, unknown> = { ...updates }
+      if (updates.description !== undefined) {
+        dbUpdates.description = updates.description || null
+      }
+
+      const result = await updateTaskAction(taskId, dbUpdates)
+      if (result.isSuccess && result.data) {
+        const updatedTask: Task = {
+          id: result.data.id,
+          useCaseId: result.data.useCaseId,
+          title: result.data.title,
+          description: result.data.description || undefined,
+          estimatedHours: result.data.estimatedHours,
+          assignedDeveloperIds: result.data.assignedDeveloperIds || [],
+          status: result.data.status,
+          dependencies: result.data.dependencies || [],
+          createdAt: result.data.createdAt.toISOString(),
+          updatedAt: result.data.updatedAt.toISOString()
+        }
+
+        const updatedTasks = data.tasks.map((task) =>
+          task.id === taskId ? updatedTask : task
+        )
+        setData({ ...data, tasks: updatedTasks })
+        toast.success("Task updated successfully")
+      } else {
+        toast.error("Failed to update task: " + result.message)
+      }
     } else {
-      toast.error("Failed to update task")
+      // Fallback to file system
+      const now = new Date().toISOString()
+      const updatedTasks = data.tasks.map((task) =>
+        task.id === taskId
+          ? { ...task, ...updates, updatedAt: now }
+          : task
+      )
+
+      const updatedData: PlanningData = {
+        ...data,
+        tasks: updatedTasks
+      }
+
+      const result = await writePlanningDataWithFallback(updatedData)
+      if (result.success) {
+        setData(updatedData)
+        toast.success("Task updated successfully (file system)")
+      } else {
+        toast.error("Failed to update task")
+      }
     }
   }
 
   const handleTaskAdd = async (
     task: Omit<Task, "id" | "createdAt" | "updatedAt">
   ) => {
-    const now = new Date().toISOString()
-    const newTask: Task = {
-      ...task,
-      id: `task-${Date.now()}`,
-      createdAt: now,
-      updatedAt: now
-    }
+    const { checkDatabaseAvailableAction } = await import("@/actions/db/db-actions")
+    const { createTaskAction } = await import("@/actions/db/tasks-actions")
 
-    const updatedData: PlanningData = {
-      ...data,
-      tasks: [...data.tasks, newTask]
-    }
+    const dbAvailable = await checkDatabaseAvailableAction()
 
-    const result = await writePlanningDataWithFallback(updatedData)
-    if (result.success) {
-      setData(updatedData)
-      toast.success("Task added successfully")
+    if (dbAvailable) {
+      const taskId = `task-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+      const taskData = {
+        id: taskId,
+        useCaseId: task.useCaseId,
+        title: task.title,
+        description: task.description || null,
+        estimatedHours: task.estimatedHours,
+        assignedDeveloperIds: task.assignedDeveloperIds,
+        status: task.status,
+        dependencies: task.dependencies
+      }
+
+      const result = await createTaskAction(taskData)
+      if (result.isSuccess && result.data) {
+        const newTask: Task = {
+          id: result.data.id,
+          useCaseId: result.data.useCaseId,
+          title: result.data.title,
+          description: result.data.description || undefined,
+          estimatedHours: result.data.estimatedHours,
+          assignedDeveloperIds: result.data.assignedDeveloperIds || [],
+          status: result.data.status,
+          dependencies: result.data.dependencies || [],
+          createdAt: result.data.createdAt.toISOString(),
+          updatedAt: result.data.updatedAt.toISOString()
+        }
+        setData({ ...data, tasks: [...data.tasks, newTask] })
+        toast.success("Task added successfully")
+      } else {
+        toast.error("Failed to add task: " + result.message)
+      }
     } else {
-      toast.error("Failed to add task")
+      // Fallback to file system
+      const now = new Date().toISOString()
+      const newTask: Task = {
+        ...task,
+        id: `task-${Date.now()}`,
+        createdAt: now,
+        updatedAt: now
+      }
+
+      const updatedData: PlanningData = {
+        ...data,
+        tasks: [...data.tasks, newTask]
+      }
+
+      const result = await writePlanningDataWithFallback(updatedData)
+      if (result.success) {
+        setData(updatedData)
+        toast.success("Task added successfully (file system)")
+      } else {
+        toast.error("Failed to add task")
+      }
     }
   }
 
   const handleTaskDelete = async (taskId: string) => {
     if (!confirm("Are you sure you want to delete this task?")) return
 
-    const updatedTasks = data.tasks.filter((task) => task.id !== taskId)
-    const updatedData: PlanningData = {
-      ...data,
-      tasks: updatedTasks
-    }
+    const { checkDatabaseAvailableAction } = await import("@/actions/db/db-actions")
+    const { deleteTaskAction } = await import("@/actions/db/tasks-actions")
 
-    const result = await writePlanningDataWithFallback(updatedData)
-    if (result.success) {
-      setData(updatedData)
-      toast.success("Task deleted successfully")
+    const dbAvailable = await checkDatabaseAvailableAction()
+
+    if (dbAvailable) {
+      const result = await deleteTaskAction(taskId)
+      if (result.isSuccess) {
+        const updatedTasks = data.tasks.filter((task) => task.id !== taskId)
+        setData({ ...data, tasks: updatedTasks })
+        toast.success("Task deleted successfully")
+      } else {
+        toast.error("Failed to delete task: " + result.message)
+      }
     } else {
-      toast.error("Failed to delete task")
+      // Fallback to file system
+      const updatedTasks = data.tasks.filter((task) => task.id !== taskId)
+      const updatedData: PlanningData = {
+        ...data,
+        tasks: updatedTasks
+      }
+
+      const result = await writePlanningDataWithFallback(updatedData)
+      if (result.success) {
+        setData(updatedData)
+        toast.success("Task deleted successfully (file system)")
+      } else {
+        toast.error("Failed to delete task")
+      }
     }
   }
 

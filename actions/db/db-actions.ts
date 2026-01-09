@@ -10,3 +10,4 @@ export async function checkDatabaseAvailableAction(): Promise<boolean> {
   return isDatabaseAvailable()
 }
 
+
