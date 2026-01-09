@@ -31,7 +31,9 @@ import {
   ChevronDown,
   ChevronRight,
   Search,
-  Filter
+  Filter,
+  X,
+  CalendarX2
 } from "lucide-react"
 import type {
   PlanningData,
@@ -617,6 +619,39 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
     } else {
       toast.error("Failed to update status")
       }
+    }
+  }
+
+  const handleResetAllStartDates = async () => {
+    const useCasesWithDates = data.useCases.filter((uc) => uc.startDate)
+    if (useCasesWithDates.length === 0) {
+      toast.info("No use cases have start dates set")
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Reset start dates for ${useCasesWithDates.length} use case(s)? This action cannot be undone.`
+    )
+    if (!confirmed) return
+
+    const now = new Date().toISOString()
+    const updatedUseCases = data.useCases.map((uc) => ({
+      ...uc,
+      startDate: undefined,
+      updatedAt: now
+    }))
+
+    const updatedData: PlanningData = {
+      ...data,
+      useCases: updatedUseCases
+    }
+
+    const result = await writePlanningDataWithFallback(updatedData)
+    if (result.success) {
+      setData(updatedData)
+      toast.success(`Reset start dates for ${useCasesWithDates.length} use case(s)`)
+    } else {
+      toast.error("Failed to reset start dates")
     }
   }
 
@@ -1412,17 +1447,35 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="usecase-start-date">Start Date (optional)</Label>
-                  <Input
-                    id="usecase-start-date"
-                    type="date"
-                    value={useCaseFormData.startDate}
-                    onChange={(e) =>
-                      setUseCaseFormData({
-                        ...useCaseFormData,
-                        startDate: e.target.value
-                      })
-                    }
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      id="usecase-start-date"
+                      type="date"
+                      value={useCaseFormData.startDate}
+                      onChange={(e) =>
+                        setUseCaseFormData({
+                          ...useCaseFormData,
+                          startDate: e.target.value
+                        })
+                      }
+                    />
+                    {useCaseFormData.startDate && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() =>
+                          setUseCaseFormData({
+                            ...useCaseFormData,
+                            startDate: ""
+                          })
+                        }
+                        title="Clear start date"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <Button type="submit" className="w-full">
                   {editingUseCase ? "Update" : "Add"} Use Case
@@ -1445,6 +1498,15 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
             onToggle={columnSettings.toggleColumn}
           />
         )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleResetAllStartDates}
+          title="Reset all start dates"
+        >
+          <CalendarX2 className="mr-2 h-4 w-4" />
+          Reset All Dates
+        </Button>
       </div>
 
       <div className="flex gap-4">
