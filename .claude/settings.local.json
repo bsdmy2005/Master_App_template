@@ -4,7 +4,13 @@
       "Bash(npm run types:*)",
       "Bash(npx tsc:*)",
       "Bash(npm run build:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npx next lint)",
+      "Bash(npx eslint:*)",
+      "Bash(find:*)",
+      "Bash(npx shadcn@latest add slider:*)",
+      "Bash(npx shadcn@latest add tabs:*)"
     ]
   }
 }

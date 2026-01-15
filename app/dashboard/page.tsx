@@ -12,6 +12,7 @@ import { GanttChartModern } from "./_components/gantt-chart-modern"
 import { DeveloperPlanning } from "./_components/developer-planning"
 import { EffortConfig } from "./_components/effort-config"
 import { EstimationGuide } from "./_components/estimation-guide"
+import { ProgressReport } from "./_components/progress-report"
 import { EffortConfigProvider } from "@/lib/effort-config-context"
 import type { PlanningData } from "@/types/planning-types"
 import { readPlanningDataWithFallback, writePlanningDataWithFallback } from "@/lib/storage-db"
@@ -28,6 +29,7 @@ type ViewType =
   | "timeline"
   | "gantt"
   | "planning"
+  | "progress"
   | "settings"
   | "guide"
 
@@ -132,6 +134,9 @@ export default function DashboardPage() {
             {currentView === "gantt" && data && <GanttChartModern data={data} setData={setData} />}
             {currentView === "planning" && data && (
               <DeveloperPlanning data={data} setData={setData} />
+            )}
+            {currentView === "progress" && data && (
+              <ProgressReport data={data} setData={setData} />
             )}
             {currentView === "settings" && data && (
               <EffortConfig data={data} setData={setData} />

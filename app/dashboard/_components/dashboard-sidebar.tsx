@@ -10,7 +10,8 @@ import {
   TrendingUp,
   GitBranch,
   Settings,
-  BookOpen
+  BookOpen,
+  ClipboardCheck
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -23,6 +24,7 @@ type ViewType =
   | "timeline"
   | "gantt"
   | "planning"
+  | "progress"
   | "settings"
   | "guide"
 
@@ -39,6 +41,7 @@ const navigation = [
   { id: "timeline", label: "Timeline", icon: Calendar },
   { id: "gantt", label: "Gantt Chart", icon: GanttChartSquare },
   { id: "planning", label: "Planning", icon: TrendingUp },
+  { id: "progress", label: "Progress Report", icon: ClipboardCheck },
   { id: "settings", label: "Effort Config", icon: Settings },
   { id: "guide", label: "Estimation Guide", icon: BookOpen }
 ] as const

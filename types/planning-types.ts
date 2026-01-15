@@ -47,15 +47,23 @@ export interface UseCase {
   keyAcceptanceCriteria?: string
   complexity: Complexity
   gap: GapLevel // 5-level system: 1=no gap, 5=very far
-  manDays: number // calculated from complexity + gap
+  manDays: number // calculated from complexity + gap, or manually overridden
+  isManDaysManualOverride?: boolean // if true, manDays was manually set and won't be recalculated
   sdkGaps?: string
   status: UseCaseStatus
   priority: Priority
   startDate?: string // ISO date string
   assignedDeveloperIds?: string[] // array of developer IDs - multiple developers per use case
+  // Progress tracking fields
+  progressPercent?: number // 0-100, manually entered by developers
+  progressNotes?: string // Commentary about progress, blockers, complexities
+  lastProgressUpdate?: string // ISO date - when progress was last updated
   createdAt: string
   updatedAt: string
 }
+
+// Progress schedule status
+export type ScheduleStatus = "not-started" | "ahead" | "on-track" | "behind" | "at-risk" | "completed"
 
 export interface Task {
   id: string

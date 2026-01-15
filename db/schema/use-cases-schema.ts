@@ -1,4 +1,4 @@
-import { pgEnum, pgTable, text, integer, timestamp, doublePrecision } from "drizzle-orm/pg-core"
+import { pgEnum, pgTable, text, integer, timestamp, doublePrecision, boolean } from "drizzle-orm/pg-core"
 import { relations } from "drizzle-orm"
 import { clientsTable } from "./clients-schema"
 import { tasksTable } from "./tasks-schema"
@@ -32,11 +32,16 @@ export const useCasesTable = pgTable("use_cases", {
   complexity: complexityEnum("complexity").notNull(),
   gap: gapLevelEnum("gap").notNull(),
   manDays: doublePrecision("man_days").notNull(),
+  isManDaysManualOverride: boolean("is_man_days_manual_override").default(false),
   sdkGaps: text("sdk_gaps"),
   status: useCaseStatusEnum("status").notNull(),
   priority: priorityEnum("priority").notNull().default("medium"),
   startDate: timestamp("start_date"),
   assignedDeveloperIds: text("assigned_developer_ids").array(), // Array of developer IDs
+  // Progress tracking fields
+  progressPercent: doublePrecision("progress_percent").default(0),
+  progressNotes: text("progress_notes"),
+  lastProgressUpdate: timestamp("last_progress_update"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -52,6 +53,7 @@ import { useEffortConfig } from "@/lib/effort-config-context"
 import { complexityLabels, gapLevelLabels } from "@/lib/effort-formula"
 import { calculateTimelines, type UseCaseTimeline } from "@/lib/timeline-calculator"
 import { toast } from "sonner"
+import { compareUseCaseIds } from "@/lib/utils"
 import { ViewSwitcher } from "./view-switcher"
 import { ViewFormatToggle } from "./view-format-toggle"
 import { UseCaseTable } from "./use-case-table"
@@ -100,7 +102,9 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
     status: "high-level definition" as UseCaseStatus,
     priority: "medium" as Priority,
     startDate: "",
-    assignedDeveloperIds: [] as string[]
+    assignedDeveloperIds: [] as string[],
+    isManDaysManualOverride: false,
+    manDaysOverride: null as number | null
   })
 
   const [useCaseTasks, setUseCaseTasks] = useState<Task[]>([])
@@ -152,7 +156,7 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
         })
         break
       case "usecase":
-        filtered.sort((a, b) => a.title.localeCompare(b.title))
+        filtered.sort((a, b) => compareUseCaseIds(a.useCaseId, b.useCaseId))
         break
       default:
         // client view - keep grouped by client
@@ -287,10 +291,14 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
 
     const dbAvailable = await checkDatabaseAvailableAction()
 
-    const manDays = calculateEffort(
+    // Use manual override if set, otherwise calculate
+    const calculatedManDays = calculateEffort(
       useCaseFormData.complexity,
       useCaseFormData.gap
     )
+    const manDays = useCaseFormData.isManDaysManualOverride && useCaseFormData.manDaysOverride !== null
+      ? useCaseFormData.manDaysOverride
+      : calculatedManDays
 
     const now = new Date().toISOString()
 
@@ -300,6 +308,7 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
         const useCaseData = {
           ...useCaseFormData,
           manDays,
+          isManDaysManualOverride: useCaseFormData.isManDaysManualOverride,
           startDate: useCaseFormData.startDate ? new Date(useCaseFormData.startDate) : null
         }
         const result = await updateUseCaseAction(editingUseCase.id, useCaseData)
@@ -316,11 +325,15 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
             complexity: result.data.complexity,
             gap: result.data.gap,
             manDays: result.data.manDays,
+            isManDaysManualOverride: result.data.isManDaysManualOverride || undefined,
             sdkGaps: result.data.sdkGaps || undefined,
             status: result.data.status,
             priority: result.data.priority,
             startDate: result.data.startDate?.toISOString(),
             assignedDeveloperIds: result.data.assignedDeveloperIds || undefined,
+            progressPercent: result.data.progressPercent ?? undefined,
+            progressNotes: result.data.progressNotes || undefined,
+            lastProgressUpdate: result.data.lastProgressUpdate?.toISOString(),
             createdAt: result.data.createdAt.toISOString(),
             updatedAt: result.data.updatedAt.toISOString()
           }
@@ -386,7 +399,9 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
             status: "high-level definition",
             priority: "medium" as Priority,
             startDate: "",
-            assignedDeveloperIds: []
+            assignedDeveloperIds: [],
+            isManDaysManualOverride: false,
+            manDaysOverride: null
           })
           toast.success("Use case updated successfully")
         } else {
@@ -399,6 +414,7 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
           id: useCaseId,
           ...useCaseFormData,
           manDays,
+          isManDaysManualOverride: useCaseFormData.isManDaysManualOverride,
           startDate: useCaseFormData.startDate ? new Date(useCaseFormData.startDate) : null
         }
         const result = await createUseCaseAction(useCaseData)
@@ -414,11 +430,15 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
             complexity: result.data.complexity,
             gap: result.data.gap,
             manDays: result.data.manDays,
+            isManDaysManualOverride: result.data.isManDaysManualOverride || undefined,
             sdkGaps: result.data.sdkGaps || undefined,
             status: result.data.status,
             priority: result.data.priority,
             startDate: result.data.startDate?.toISOString(),
             assignedDeveloperIds: result.data.assignedDeveloperIds || undefined,
+            progressPercent: result.data.progressPercent ?? undefined,
+            progressNotes: result.data.progressNotes || undefined,
+            lastProgressUpdate: result.data.lastProgressUpdate?.toISOString(),
             createdAt: result.data.createdAt.toISOString(),
             updatedAt: result.data.updatedAt.toISOString()
           }
@@ -472,7 +492,9 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
             status: "high-level definition",
             priority: "medium" as Priority,
             startDate: "",
-            assignedDeveloperIds: []
+            assignedDeveloperIds: [],
+            isManDaysManualOverride: false,
+            manDaysOverride: null
           })
           toast.success("Use case added successfully")
         } else {
@@ -492,6 +514,7 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
                 ...uc,
                 ...useCaseFormData,
                 manDays,
+                isManDaysManualOverride: useCaseFormData.isManDaysManualOverride,
                 updatedAt: now
               }
             : uc
@@ -502,6 +525,7 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
           id: useCaseId,
           ...useCaseFormData,
           manDays,
+          isManDaysManualOverride: useCaseFormData.isManDaysManualOverride,
           createdAt: now,
           updatedAt: now
         }
@@ -544,7 +568,9 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
           status: "high-level definition",
           priority: "medium" as Priority,
           startDate: "",
-          assignedDeveloperIds: []
+          assignedDeveloperIds: [],
+          isManDaysManualOverride: false,
+          manDaysOverride: null
         })
         toast.success(
           editingUseCase
@@ -1058,7 +1084,7 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
     data.clients.forEach((client) => {
       const clientUseCases = filteredAndSortedUseCases
         .filter((uc) => uc.clientId === client.id)
-        .sort((a, b) => a.useCaseId.localeCompare(b.useCaseId))
+        .sort((a, b) => compareUseCaseIds(a.useCaseId, b.useCaseId))
       grouped.set(client.id, clientUseCases)
     })
     return grouped
@@ -1170,7 +1196,9 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
                   status: "high-level definition",
                   priority: "medium" as Priority,
                   startDate: "",
-                  assignedDeveloperIds: []
+                  assignedDeveloperIds: [],
+                  isManDaysManualOverride: false,
+                  manDaysOverride: null
                 })
                 setUseCaseTasks([])
                 setEditingTask(null)
@@ -1413,15 +1441,71 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
                     })()}
                   </div>
 
-                  {/* Final Result */}
-                  <div className="flex items-center justify-between pt-2 border-t">
-                    <span className="text-sm font-medium">Estimated Man-Days</span>
-                    <span className="text-2xl font-bold">
-                      {calculateEffort(
-                        useCaseFormData.complexity,
-                        useCaseFormData.gap
-                      ).toFixed(1)}
-                    </span>
+                  {/* Final Result with Override Option */}
+                  <div className="pt-2 border-t space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Calculated Estimate</span>
+                      <span className={`text-xl font-bold ${useCaseFormData.isManDaysManualOverride ? "text-muted-foreground line-through" : ""}`}>
+                        {calculateEffort(
+                          useCaseFormData.complexity,
+                          useCaseFormData.gap
+                        ).toFixed(1)} days
+                      </span>
+                    </div>
+
+                    {/* Manual Override Toggle */}
+                    <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
+                      <Checkbox
+                        id="mandays-override"
+                        checked={useCaseFormData.isManDaysManualOverride}
+                        onCheckedChange={(checked) =>
+                          setUseCaseFormData({
+                            ...useCaseFormData,
+                            isManDaysManualOverride: checked === true,
+                            manDaysOverride: checked
+                              ? (useCaseFormData.manDaysOverride ?? calculateEffort(useCaseFormData.complexity, useCaseFormData.gap))
+                              : null
+                          })
+                        }
+                      />
+                      <Label htmlFor="mandays-override" className="text-sm cursor-pointer flex-1">
+                        Override with custom value
+                      </Label>
+                      {useCaseFormData.isManDaysManualOverride && (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            step="0.5"
+                            min="0.5"
+                            value={useCaseFormData.manDaysOverride ?? ""}
+                            onChange={(e) =>
+                              setUseCaseFormData({
+                                ...useCaseFormData,
+                                manDaysOverride: parseFloat(e.target.value) || 0
+                              })
+                            }
+                            className="w-20 h-8"
+                          />
+                          <span className="text-sm text-muted-foreground">days</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Effective Man-Days */}
+                    <div className="flex items-center justify-between bg-primary/10 p-2 rounded-lg">
+                      <span className="text-sm font-medium">Effective Man-Days</span>
+                      <span className="text-2xl font-bold text-primary">
+                        {useCaseFormData.isManDaysManualOverride && useCaseFormData.manDaysOverride !== null
+                          ? useCaseFormData.manDaysOverride.toFixed(1)
+                          : calculateEffort(useCaseFormData.complexity, useCaseFormData.gap).toFixed(1)}
+                      </span>
+                    </div>
+
+                    {useCaseFormData.isManDaysManualOverride && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        ⚠️ Manual override is set. This value won't change when effort weights are recalculated.
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -1886,7 +1970,9 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
               priority: useCase.priority,
               // Ensure date is in YYYY-MM-DD format for HTML date input
               startDate: useCase.startDate ? useCase.startDate.split("T")[0] : "",
-              assignedDeveloperIds: useCase.assignedDeveloperIds || []
+              assignedDeveloperIds: useCase.assignedDeveloperIds || [],
+              isManDaysManualOverride: useCase.isManDaysManualOverride || false,
+              manDaysOverride: useCase.isManDaysManualOverride ? useCase.manDays : null
             })
             // Load tasks for this use case
             const useCaseTasks = data.tasks.filter(
@@ -1987,7 +2073,9 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
                                 priority: useCase.priority,
                                 // Ensure date is in YYYY-MM-DD format for HTML date input
                                 startDate: useCase.startDate ? useCase.startDate.split("T")[0] : "",
-                                assignedDeveloperIds: useCase.assignedDeveloperIds || []
+                                assignedDeveloperIds: useCase.assignedDeveloperIds || [],
+                                isManDaysManualOverride: useCase.isManDaysManualOverride || false,
+                                manDaysOverride: useCase.isManDaysManualOverride ? useCase.manDays : null
                               })
                               // Load tasks for this use case
                               const useCaseTasks = data.tasks.filter(
@@ -2041,7 +2129,9 @@ export function ClientManagement({ data, setData }: ClientManagementProps) {
                         priority: useCase.priority,
                         // Ensure date is in YYYY-MM-DD format for HTML date input
                         startDate: useCase.startDate ? useCase.startDate.split("T")[0] : "",
-                        assignedDeveloperIds: useCase.assignedDeveloperIds || []
+                        assignedDeveloperIds: useCase.assignedDeveloperIds || [],
+                        isManDaysManualOverride: useCase.isManDaysManualOverride || false,
+                        manDaysOverride: useCase.isManDaysManualOverride ? useCase.manDays : null
                       })
                       // Load tasks for this use case
                       const useCaseTasks = data.tasks.filter(

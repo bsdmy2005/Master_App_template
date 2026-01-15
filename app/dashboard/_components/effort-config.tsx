@@ -143,12 +143,18 @@ export function EffortConfig({ data, setData }: EffortConfigProps) {
       // Save config to database via context
       saveContextConfig(config)
 
-      // Recalculate all use cases with new config
-      const updatedUseCases = data.useCases.map((useCase) => ({
-        ...useCase,
-        manDays: calculateManDays(useCase.complexity, useCase.gap, config),
-        updatedAt: new Date().toISOString()
-      }))
+      // Recalculate use cases with new config (skip manually overridden ones)
+      const updatedUseCases = data.useCases.map((useCase) => {
+        // Skip recalculation if man-days was manually overridden
+        if (useCase.isManDaysManualOverride) {
+          return useCase
+        }
+        return {
+          ...useCase,
+          manDays: calculateManDays(useCase.complexity, useCase.gap, config),
+          updatedAt: new Date().toISOString()
+        }
+      })
 
       const updatedData: PlanningData = {
         ...data,

@@ -55,6 +55,7 @@ export async function readPlanningDataAction(): Promise<
         complexity: uc.complexity as "low" | "medium" | "high",
         gap: uc.gap as GapLevel,
         manDays: uc.manDays,
+        isManDaysManualOverride: uc.isManDaysManualOverride || undefined,
         sdkGaps: uc.sdkGaps || undefined,
         status: uc.status as any,
         priority: (typeof uc.priority === "number"
@@ -62,6 +63,9 @@ export async function readPlanningDataAction(): Promise<
           : uc.priority) as Priority,
         startDate: uc.startDate?.toISOString(),
         assignedDeveloperIds: uc.assignedDeveloperIds || undefined,
+        progressPercent: uc.progressPercent ?? undefined,
+        progressNotes: uc.progressNotes || undefined,
+        lastProgressUpdate: uc.lastProgressUpdate?.toISOString(),
         createdAt: uc.createdAt.toISOString(),
         updatedAt: uc.updatedAt.toISOString()
       })),
@@ -171,22 +175,26 @@ export async function writePlanningDataAction(
             }
             
             return {
-            id: uc.id,
-            clientId: uc.clientId,
-            useCaseId: uc.useCaseId,
-            title: uc.title,
-            description: uc.description || null,
-            keyAcceptanceCriteria: uc.keyAcceptanceCriteria || null,
-            complexity: uc.complexity,
+              id: uc.id,
+              clientId: uc.clientId,
+              useCaseId: uc.useCaseId,
+              title: uc.title,
+              description: uc.description || null,
+              keyAcceptanceCriteria: uc.keyAcceptanceCriteria || null,
+              complexity: uc.complexity,
               gap: gapValue,
-            manDays: uc.manDays,
-            sdkGaps: uc.sdkGaps || null,
-            status: uc.status,
-            priority: priorityValue,
-            startDate: uc.startDate ? new Date(uc.startDate) : null,
-            assignedDeveloperIds: uc.assignedDeveloperIds || null,
-            createdAt: new Date(uc.createdAt),
-            updatedAt: new Date(uc.updatedAt)
+              manDays: uc.manDays,
+              isManDaysManualOverride: uc.isManDaysManualOverride || false,
+              sdkGaps: uc.sdkGaps || null,
+              status: uc.status,
+              priority: priorityValue,
+              startDate: uc.startDate ? new Date(uc.startDate) : null,
+              assignedDeveloperIds: uc.assignedDeveloperIds || null,
+              progressPercent: uc.progressPercent ?? 0,
+              progressNotes: uc.progressNotes || null,
+              lastProgressUpdate: uc.lastProgressUpdate ? new Date(uc.lastProgressUpdate) : null,
+              createdAt: new Date(uc.createdAt),
+              updatedAt: new Date(uc.updatedAt)
             }
           })
         )

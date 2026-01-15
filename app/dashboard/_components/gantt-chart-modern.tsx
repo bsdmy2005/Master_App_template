@@ -4,6 +4,8 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Slider } from "@/components/ui/slider"
 import {
   Tooltip,
   TooltipContent,
@@ -19,6 +21,15 @@ import {
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
   Calendar,
   ZoomIn,
   ZoomOut,
@@ -33,12 +44,25 @@ import {
   GripVertical,
   Maximize2,
   Minimize2,
-  Loader2
+  Loader2,
+  Users,
+  Save,
+  Clock,
+  User,
+  FileText,
+  TrendingUp,
+  AlertCircle
 } from "lucide-react"
-import type { PlanningData, TimeScale, GanttFilters } from "@/types/planning-types"
+import type { PlanningData, TimeScale, GanttFilters, Complexity, GapLevel, UseCaseStatus, Priority } from "@/types/planning-types"
 import { calculateTimelines, type UseCaseTimeline } from "@/lib/timeline-calculator"
 import { writePlanningDataWithFallback } from "@/lib/storage-db"
-import { cn } from "@/lib/utils"
+import { cn, compareUseCaseIds } from "@/lib/utils"
+import {
+  getScheduleStatus,
+  getScheduleStatusInfo,
+  calculateExpectedProgress,
+  formatProgress
+} from "@/lib/progress-utils"
 import { toast } from "sonner"
 
 // Constants for layout
@@ -64,6 +88,23 @@ const PRIORITY_STYLES: Record<string, string> = {
   high: "ring-2 ring-red-400 ring-offset-1",
   medium: "",
   low: "opacity-80"
+}
+
+// Sort options for use cases
+type SortOption = "original" | "use-case-asc" | "use-case-desc"
+
+// Helper function to get developer initials (first letter of first name + first letter of last name)
+function getDeveloperInitials(name: string): string {
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 0) return ""
+
+  const firstName = parts[0] || ""
+  const lastName = parts.length > 1 ? parts[parts.length - 1] : ""
+
+  const firstInitial = firstName.charAt(0).toUpperCase()
+  const lastInitial = lastName.charAt(0).toUpperCase()
+
+  return firstInitial + lastInitial
 }
 
 interface GanttChartModernProps {
@@ -447,6 +488,8 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
   const [showFilters, setShowFilters] = useState(false)
   const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set())
   const [zoomLevel, setZoomLevel] = useState(1)
+  const [sortOption, setSortOption] = useState<SortOption>("use-case-asc")
+  const [showDevelopers, setShowDevelopers] = useState(false)
 
   // Timeline navigation - null means auto (1 week before today)
   const [viewStartDate, setViewStartDate] = useState<Date | null>(null)
@@ -464,6 +507,32 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
 
   // Recalculating state - shows visual feedback during timeline recalculation
   const [isRecalculating, setIsRecalculating] = useState(false)
+
+  // Use case edit dialog state
+  const [selectedUseCaseId, setSelectedUseCaseId] = useState<string | null>(null)
+  const [editDialogTab, setEditDialogTab] = useState<"details" | "progress">("details")
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Use case edit form data
+  const [useCaseFormData, setUseCaseFormData] = useState({
+    title: "",
+    description: "",
+    keyAcceptanceCriteria: "",
+    complexity: "medium" as Complexity,
+    gap: "moderate-extension" as GapLevel,
+    sdkGaps: "",
+    status: "high-level definition" as UseCaseStatus,
+    priority: "medium" as Priority,
+    assignedDeveloperIds: [] as string[],
+    startDate: "",
+    isManDaysManualOverride: false,
+    manDaysOverride: null as number | null,
+    progressPercent: 0,
+    progressNotes: ""
+  })
+
+  // Track if mouse moved during drag (to distinguish click from drag)
+  const clickStartRef = useRef<{ x: number; y: number } | null>(null)
 
   // Refs
   const timelineRef = useRef<HTMLDivElement>(null)
@@ -587,18 +656,26 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
       groups.get(client.id)!.items.push({ timeline, useCase })
     }
 
-    // Sort items within each group by their original order in data.useCases (stable order)
-    // This prevents reordering when start dates change during drag-and-drop
+    // Sort items within each group based on sort option
     for (const group of groups.values()) {
       group.items.sort((a, b) => {
-        const indexA = data.useCases.findIndex((uc) => uc.id === a.useCase.id)
-        const indexB = data.useCases.findIndex((uc) => uc.id === b.useCase.id)
-        return indexA - indexB
+        switch (sortOption) {
+          case "use-case-asc":
+            return compareUseCaseIds(a.useCase.useCaseId, b.useCase.useCaseId)
+          case "use-case-desc":
+            return compareUseCaseIds(b.useCase.useCaseId, a.useCase.useCaseId)
+          case "original":
+          default:
+            // Maintain original order from data.useCases (stable order)
+            const indexA = data.useCases.findIndex((uc) => uc.id === a.useCase.id)
+            const indexB = data.useCases.findIndex((uc) => uc.id === b.useCase.id)
+            return indexA - indexB
+        }
       })
     }
 
     return groups
-  }, [filteredTimelines, data])
+  }, [filteredTimelines, data, sortOption])
 
   // Calculate timeline width
   const totalDays = getDaysBetween(timelineStart, timelineEnd)
@@ -619,6 +696,126 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
     const daysFromStart = getDaysBetween(timelineStart, today)
     return daysFromStart * pixelsPerDay
   }, [today, timelineStart, timelineEnd, pixelsPerDay])
+
+  // Selected use case for details panel
+  const selectedUseCase = useMemo(() => {
+    if (!selectedUseCaseId) return null
+    return data.useCases.find((uc) => uc.id === selectedUseCaseId) || null
+  }, [selectedUseCaseId, data.useCases])
+
+  // Get timeline for selected use case
+  const selectedTimeline = useMemo(() => {
+    if (!selectedUseCaseId) return null
+    return timelineResult.timelines.find((t) => t.useCaseId === selectedUseCaseId) || null
+  }, [selectedUseCaseId, timelineResult.timelines])
+
+  // Get client for selected use case
+  const selectedClient = useMemo(() => {
+    if (!selectedUseCase) return null
+    return data.clients.find((c) => c.id === selectedUseCase.clientId) || null
+  }, [selectedUseCase, data.clients])
+
+  // Open use case edit dialog
+  const openUseCaseDetails = useCallback((useCaseId: string) => {
+    const useCase = data.useCases.find((uc) => uc.id === useCaseId)
+    if (useCase) {
+      setSelectedUseCaseId(useCaseId)
+      setEditDialogTab("details")
+      setUseCaseFormData({
+        title: useCase.title,
+        description: useCase.description || "",
+        keyAcceptanceCriteria: useCase.keyAcceptanceCriteria || "",
+        complexity: useCase.complexity,
+        gap: useCase.gap,
+        sdkGaps: useCase.sdkGaps || "",
+        status: useCase.status,
+        priority: useCase.priority,
+        assignedDeveloperIds: useCase.assignedDeveloperIds || [],
+        startDate: useCase.startDate ? useCase.startDate.split("T")[0] : "",
+        isManDaysManualOverride: useCase.isManDaysManualOverride || false,
+        manDaysOverride: useCase.isManDaysManualOverride ? useCase.manDays : null,
+        progressPercent: useCase.progressPercent ?? 0,
+        progressNotes: useCase.progressNotes || ""
+      })
+    }
+  }, [data.useCases])
+
+  // Close use case edit dialog
+  const closeUseCaseDetails = useCallback(() => {
+    setSelectedUseCaseId(null)
+  }, [])
+
+  // Save use case from edit dialog
+  const saveUseCaseFromDialog = useCallback(async () => {
+    if (!selectedUseCaseId || !setData) return
+
+    setIsSaving(true)
+
+    // Calculate man-days based on complexity/gap or manual override
+    const calculateEffort = (complexity: Complexity, gap: GapLevel): number => {
+      const complexityWeights = { low: 0.5, medium: 1, high: 1.5 }
+      const gapWeights = {
+        "sdk-native": 0.5,
+        "minor-extension": 1,
+        "moderate-extension": 2,
+        "significant-extension": 4,
+        "custom-implementation": 8
+      }
+      const formulaParams = {
+        low: { base: 1, multiplier: 0.5 },
+        medium: { base: 2, multiplier: 1 },
+        high: { base: 3, multiplier: 1.5 }
+      }
+      const base = formulaParams[complexity].base
+      const multiplier = formulaParams[complexity].multiplier
+      return base + complexityWeights[complexity] * gapWeights[gap] * multiplier
+    }
+
+    const manDays = useCaseFormData.isManDaysManualOverride && useCaseFormData.manDaysOverride !== null
+      ? useCaseFormData.manDaysOverride
+      : calculateEffort(useCaseFormData.complexity, useCaseFormData.gap)
+
+    const updatedUseCases = data.useCases.map((uc) => {
+      if (uc.id === selectedUseCaseId) {
+        return {
+          ...uc,
+          title: useCaseFormData.title,
+          description: useCaseFormData.description || undefined,
+          keyAcceptanceCriteria: useCaseFormData.keyAcceptanceCriteria || undefined,
+          complexity: useCaseFormData.complexity,
+          gap: useCaseFormData.gap,
+          manDays,
+          isManDaysManualOverride: useCaseFormData.isManDaysManualOverride,
+          sdkGaps: useCaseFormData.sdkGaps || undefined,
+          status: useCaseFormData.status,
+          priority: useCaseFormData.priority,
+          assignedDeveloperIds: useCaseFormData.assignedDeveloperIds.length > 0
+            ? useCaseFormData.assignedDeveloperIds
+            : undefined,
+          startDate: useCaseFormData.startDate || undefined,
+          progressPercent: useCaseFormData.progressPercent,
+          progressNotes: useCaseFormData.progressNotes || undefined,
+          lastProgressUpdate: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      }
+      return uc
+    })
+
+    const updatedData = { ...data, useCases: updatedUseCases }
+    setData(updatedData)
+
+    try {
+      await writePlanningDataWithFallback(updatedData)
+      toast.success("Use case updated")
+      closeUseCaseDetails()
+    } catch (error) {
+      console.error("Failed to save:", error)
+      toast.error("Failed to save changes")
+    }
+
+    setIsSaving(false)
+  }, [selectedUseCaseId, useCaseFormData, data, setData, closeUseCaseDetails])
 
   // Calculate bar position
   const getBarPosition = useCallback(
@@ -696,6 +893,7 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
     setSearchQuery("")
     setCollapsedClients(new Set())
     setViewStartDate(null) // Reset to auto
+    setSortOption("original") // Reset sort to original order
   }
 
   // Jump to today
@@ -743,11 +941,17 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
 
   // Drag handlers for rescheduling
   const handleDragStart = (useCaseId: string, e: React.MouseEvent) => {
-    if (!setData) return // Can't drag if no setData
-
     e.preventDefault()
+
+    // Track click start position to detect click vs drag
+    clickStartRef.current = { x: e.clientX, y: e.clientY }
+
+    if (!setData) {
+      // Can't drag if no setData, but can still click to open details
+      return
+    }
+
     const bar = e.currentTarget as HTMLElement
-    const barRect = bar.getBoundingClientRect()
 
     setDragState({
       useCaseId,
@@ -771,7 +975,32 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
 
   const handleDragEnd = useCallback(
     async (e: MouseEvent) => {
-      if (!dragState || !setData) {
+      const clickStart = clickStartRef.current
+      clickStartRef.current = null
+
+      // Check if this was a click (mouse didn't move much)
+      const CLICK_THRESHOLD = 5 // pixels
+      const wasClick = clickStart &&
+        Math.abs(e.clientX - clickStart.x) < CLICK_THRESHOLD &&
+        Math.abs(e.clientY - clickStart.y) < CLICK_THRESHOLD
+
+      if (!dragState) {
+        document.body.style.cursor = ""
+        return
+      }
+
+      const useCaseId = dragState.useCaseId
+
+      // If it was just a click (not a drag), open the details panel
+      if (wasClick) {
+        setDragState(null)
+        document.body.style.cursor = ""
+        openUseCaseDetails(useCaseId)
+        return
+      }
+
+      // Not a click, handle as drag
+      if (!setData) {
         setDragState(null)
         document.body.style.cursor = ""
         return
@@ -788,7 +1017,7 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
       newStartDate.setHours(0, 0, 0, 0)
 
       // Find the use case and update it
-      const useCase = data.useCases.find((uc) => uc.id === dragState.useCaseId)
+      const useCase = data.useCases.find((uc) => uc.id === useCaseId)
       if (!useCase) {
         setDragState(null)
         document.body.style.cursor = ""
@@ -805,7 +1034,7 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
 
       // Update the use case with new start date
       const updatedUseCases = data.useCases.map((uc) =>
-        uc.id === dragState.useCaseId
+        uc.id === useCaseId
           ? { ...uc, startDate: newStartDate.toISOString().split("T")[0], updatedAt: new Date().toISOString() }
           : uc
       )
@@ -833,7 +1062,7 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
         toast.error("Failed to save changes")
       }
     },
-    [dragState, pixelsPerDay, timelineStart, data, setData]
+    [dragState, pixelsPerDay, timelineStart, data, setData, openUseCaseDetails]
   )
 
   // Add/remove global mouse event listeners for dragging
@@ -924,6 +1153,18 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
                 <SelectItem value="month">Month</SelectItem>
                 <SelectItem value="quarter">Quarter</SelectItem>
                 <SelectItem value="year">Year</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Sort selector */}
+            <Select value={sortOption} onValueChange={(v) => setSortOption(v as SortOption)}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Sort by..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="original">Original Order</SelectItem>
+                <SelectItem value="use-case-asc">Use Case (A-Z)</SelectItem>
+                <SelectItem value="use-case-desc">Use Case (Z-A)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1019,6 +1260,29 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
                 </Badge>
               )}
             </Button>
+
+            {/* Developer visibility toggle */}
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={showDevelopers ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowDevelopers(!showDevelopers)}
+                    className={cn(
+                      "gap-1.5",
+                      showDevelopers && "bg-blue-600 hover:bg-blue-700"
+                    )}
+                  >
+                    <Users className="h-4 w-4" />
+                    <span className="hidden sm:inline">Devs</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="bg-white text-gray-900 border border-gray-200 shadow-lg">
+                  <p>{showDevelopers ? "Hide developers" : "Show developers on bars"}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             <Button variant="ghost" size="sm" onClick={handleReset} title="Reset view">
               <RotateCcw className="h-4 w-4" />
@@ -1295,13 +1559,12 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
                         const statusStyle = STATUS_COLORS[useCase.status] || STATUS_COLORS["high-level definition"]
                         const priorityStyle = PRIORITY_STYLES[useCase.priority] || ""
 
-                        // Calculate progress
-                        const tasks = data.tasks.filter((t) => t.useCaseId === useCase.id)
-                        const totalHours = tasks.reduce((sum, t) => sum + t.estimatedHours, 0)
-                        const completedHours = tasks
-                          .filter((t) => t.status === "done")
-                          .reduce((sum, t) => sum + t.estimatedHours, 0)
-                        const progress = totalHours > 0 ? (completedHours / totalHours) * 100 : 0
+                        // Calculate progress from use case (manual entry)
+                        const progress = useCase.progressPercent ?? 0
+                        // Pass the capacity-adjusted end date for accurate schedule status
+                        const scheduleStatus = getScheduleStatus(useCase, timeline.endDate)
+                        const scheduleInfo = getScheduleStatusInfo(scheduleStatus)
+                        const expectedProgress = calculateExpectedProgress(useCase.startDate, timeline.endDate, useCase.manDays)
 
                         // Has conflict
                         const hasConflict = timelineResult.conflicts.some((c) =>
@@ -1346,32 +1609,146 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
                                     }}
                                     onMouseDown={(e) => canDrag && !isRecalculating && handleDragStart(useCase.id, e)}
                                   >
+                                    {/* Progress bar overlay */}
+                                    {progress > 0 && (
+                                      <div
+                                        className={cn(
+                                          "absolute inset-y-0 left-0 rounded-l opacity-40",
+                                          scheduleStatus === "at-risk" && "bg-red-600",
+                                          scheduleStatus === "behind" && "bg-orange-500",
+                                          scheduleStatus === "ahead" && "bg-green-500",
+                                          scheduleStatus === "on-track" && "bg-blue-500",
+                                          scheduleStatus === "completed" && "bg-emerald-500",
+                                          progress >= 100 && "rounded-r"
+                                        )}
+                                        style={{ width: `${Math.min(100, progress)}%` }}
+                                      />
+                                    )}
+
+                                    {/* Expected progress marker line (dotted) */}
+                                    {expectedProgress > 0 && expectedProgress < 100 && useCase.startDate && (
+                                      <TooltipProvider delayDuration={100}>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <div
+                                              className="absolute top-0 bottom-0 w-1 z-10 cursor-help"
+                                              style={{
+                                                left: `${expectedProgress}%`,
+                                                backgroundImage: "repeating-linear-gradient(to bottom, white 0px, white 3px, transparent 3px, transparent 6px)",
+                                                opacity: 0.8
+                                              }}
+                                            />
+                                          </TooltipTrigger>
+                                          <TooltipContent
+                                            side="top"
+                                            className="bg-gray-900 text-white border-gray-700"
+                                          >
+                                            <div className="text-xs">
+                                              <div className="font-semibold">Expected Progress</div>
+                                              <div>{formatProgress(expectedProgress)} based on elapsed time</div>
+                                            </div>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    )}
+
                                     {/* Drag handle indicator */}
                                     {canDrag && (
-                                      <div className="absolute left-1 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100">
+                                      <div className="absolute left-1 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100 z-10">
                                         <GripVertical className="h-3 w-3 text-white/70" />
                                       </div>
                                     )}
 
-                                    {/* Man-days label on bar (when wide enough) */}
-                                    {width > 60 && (
-                                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    {/* Man-days and progress label on bar (when wide enough) */}
+                                    {width > 50 && (
+                                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
                                         <span className={cn(
                                           "text-xs font-semibold",
                                           statusStyle.text,
                                           "drop-shadow-sm"
                                         )}>
-                                          {useCase.manDays}d
+                                          {progress > 0
+                                            ? `${useCase.manDays}d • ${Math.round(progress)}%`
+                                            : `${useCase.manDays}d`}
                                         </span>
                                       </div>
                                     )}
 
-                                    {/* Progress overlay */}
-                                    {progress > 0 && (
+                                    {/* Schedule status indicator - top-left corner */}
+                                    {scheduleStatus !== "not-started" && scheduleStatus !== "completed" && progress > 0 && (
                                       <div
-                                        className="absolute left-0 top-0 h-full bg-white/30 rounded-l"
-                                        style={{ width: `${progress}%` }}
+                                        className={cn(
+                                          "absolute -top-1 -left-1 w-3 h-3 rounded-full border border-white shadow-sm z-20",
+                                          scheduleStatus === "at-risk" && "bg-red-500",
+                                          scheduleStatus === "behind" && "bg-orange-500",
+                                          scheduleStatus === "ahead" && "bg-green-500",
+                                          scheduleStatus === "on-track" && "bg-blue-500"
+                                        )}
+                                        title={scheduleInfo.label}
                                       />
+                                    )}
+
+                                    {/* Developer initials - floating badge at top-right, controlled by toggle */}
+                                    {showDevelopers && useCase.assignedDeveloperIds && useCase.assignedDeveloperIds.length > 0 && (
+                                      <TooltipProvider delayDuration={200}>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <div
+                                              className="absolute -top-3 -right-2 flex items-center gap-0.5 pointer-events-auto cursor-default z-20"
+                                            >
+                                              <div className="flex items-center bg-white dark:bg-gray-900 rounded-full shadow-lg border-2 border-blue-400 dark:border-blue-500 px-1.5 py-0.5">
+                                                {useCase.assignedDeveloperIds
+                                                  .slice(0, 3)
+                                                  .map((devId, idx) => {
+                                                    const dev = data.developers.find((d) => d.id === devId)
+                                                    if (!dev) return null
+                                                    const initials = getDeveloperInitials(dev.name)
+                                                    return (
+                                                      <span
+                                                        key={devId}
+                                                        className={cn(
+                                                          "text-[10px] font-bold text-blue-700 dark:text-blue-300",
+                                                          idx > 0 && "ml-0.5 pl-0.5 border-l border-blue-200 dark:border-blue-700"
+                                                        )}
+                                                      >
+                                                        {initials}
+                                                      </span>
+                                                    )
+                                                  })}
+                                                {useCase.assignedDeveloperIds.length > 3 && (
+                                                  <span className="text-[9px] font-medium text-blue-500 dark:text-blue-400 ml-0.5">
+                                                    +{useCase.assignedDeveloperIds.length - 3}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </TooltipTrigger>
+                                          <TooltipContent
+                                            side="top"
+                                            className="bg-white text-gray-900 border border-gray-200 shadow-lg p-2"
+                                          >
+                                            <div className="space-y-1">
+                                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                                Assigned Developers
+                                              </div>
+                                              {useCase.assignedDeveloperIds.map((devId) => {
+                                                const dev = data.developers.find((d) => d.id === devId)
+                                                if (!dev) return null
+                                                return (
+                                                  <div key={devId} className="flex items-center gap-2">
+                                                    <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                                                      <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300">
+                                                        {getDeveloperInitials(dev.name)}
+                                                      </span>
+                                                    </div>
+                                                    <span className="text-sm">{dev.name}</span>
+                                                  </div>
+                                                )
+                                              })}
+                                            </div>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
                                     )}
 
                                     {/* Conflict indicator */}
@@ -1379,11 +1756,6 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
                                       <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center text-[10px] font-bold text-yellow-900">
                                         !
                                       </div>
-                                    )}
-
-                                    {/* Priority indicator */}
-                                    {useCase.priority === "high" && (
-                                      <div className="absolute -top-1 -left-1 w-3 h-3 bg-red-500 rounded-full border border-white" />
                                     )}
 
                                     {/* Drag preview - show new date */}
@@ -1439,13 +1811,28 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
                                       </div>
                                       <div>
                                         <span className="text-gray-500">Progress:</span>{" "}
-                                        {progress.toFixed(0)}%
+                                        <span className="font-medium">{formatProgress(progress)}</span>
+                                        {expectedProgress > 0 && (
+                                          <span className="text-gray-400"> (expected: {formatProgress(expectedProgress)})</span>
+                                        )}
                                       </div>
                                     </div>
                                     <div className="flex gap-1 flex-wrap">
                                       <Badge variant="outline" className="text-[10px] border-gray-300 text-gray-700">
                                         {useCase.status}
                                       </Badge>
+                                      {scheduleStatus !== "not-started" && (
+                                        <Badge
+                                          className={cn(
+                                            "text-[10px]",
+                                            scheduleInfo.bgColor,
+                                            scheduleInfo.color,
+                                            scheduleInfo.borderColor
+                                          )}
+                                        >
+                                          {scheduleInfo.label}
+                                        </Badge>
+                                      )}
                                       <Badge
                                         variant={useCase.priority === "high" ? "destructive" : "secondary"}
                                         className="text-[10px]"
@@ -1476,6 +1863,431 @@ export function GanttChartModern({ data, setData }: GanttChartModernProps) {
           </div>
         </div>
       </div>
+
+      {/* Use Case Edit Dialog */}
+      <Dialog open={!!selectedUseCaseId} onOpenChange={(open) => !open && closeUseCaseDetails()}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          {selectedUseCase && selectedTimeline && (
+            <>
+              <DialogHeader className="pb-4 border-b">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="font-mono">
+                    {selectedUseCase.useCaseId}
+                  </Badge>
+                  <Badge className={cn(
+                    STATUS_COLORS[useCaseFormData.status]?.bg,
+                    STATUS_COLORS[useCaseFormData.status]?.text
+                  )}>
+                    {useCaseFormData.status}
+                  </Badge>
+                </div>
+                <DialogTitle className="text-xl">Edit Use Case</DialogTitle>
+                {selectedClient && (
+                  <DialogDescription>
+                    Client: {selectedClient.name}
+                  </DialogDescription>
+                )}
+              </DialogHeader>
+
+              <Tabs value={editDialogTab} onValueChange={(v: string) => setEditDialogTab(v as "details" | "progress")} className="mt-4">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="details" className="gap-2">
+                    <FileText className="h-4 w-4" />
+                    Details
+                  </TabsTrigger>
+                  <TabsTrigger value="progress" className="gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Progress
+                  </TabsTrigger>
+                </TabsList>
+
+                {/* Details Tab */}
+                <TabsContent value="details" className="space-y-4 mt-4">
+                  {/* Title */}
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-title">Title</Label>
+                    <Input
+                      id="edit-title"
+                      value={useCaseFormData.title}
+                      onChange={(e) => setUseCaseFormData({ ...useCaseFormData, title: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-description">Description</Label>
+                    <Textarea
+                      id="edit-description"
+                      value={useCaseFormData.description}
+                      onChange={(e) => setUseCaseFormData({ ...useCaseFormData, description: e.target.value })}
+                      rows={3}
+                    />
+                  </div>
+
+                  {/* Key Acceptance Criteria */}
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-criteria">Key Acceptance Criteria</Label>
+                    <Textarea
+                      id="edit-criteria"
+                      value={useCaseFormData.keyAcceptanceCriteria}
+                      onChange={(e) => setUseCaseFormData({ ...useCaseFormData, keyAcceptanceCriteria: e.target.value })}
+                      rows={3}
+                    />
+                  </div>
+
+                  {/* Complexity and Gap */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Complexity</Label>
+                      <Select
+                        value={useCaseFormData.complexity}
+                        onValueChange={(value: Complexity) => setUseCaseFormData({ ...useCaseFormData, complexity: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Gap Level</Label>
+                      <Select
+                        value={useCaseFormData.gap}
+                        onValueChange={(value: GapLevel) => setUseCaseFormData({ ...useCaseFormData, gap: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sdk-native">SDK Native</SelectItem>
+                          <SelectItem value="minor-extension">Minor Extension</SelectItem>
+                          <SelectItem value="moderate-extension">Moderate Extension</SelectItem>
+                          <SelectItem value="significant-extension">Significant Extension</SelectItem>
+                          <SelectItem value="custom-implementation">Custom Implementation</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Man-Days Override */}
+                  <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Effort Estimate</span>
+                      <span className="text-lg font-bold">
+                        {useCaseFormData.isManDaysManualOverride && useCaseFormData.manDaysOverride !== null
+                          ? useCaseFormData.manDaysOverride.toFixed(1)
+                          : selectedUseCase.manDays.toFixed(1)} days
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        id="edit-mandays-override"
+                        checked={useCaseFormData.isManDaysManualOverride}
+                        onCheckedChange={(checked) =>
+                          setUseCaseFormData({
+                            ...useCaseFormData,
+                            isManDaysManualOverride: checked === true,
+                            manDaysOverride: checked ? (useCaseFormData.manDaysOverride ?? selectedUseCase.manDays) : null
+                          })
+                        }
+                      />
+                      <Label htmlFor="edit-mandays-override" className="text-sm cursor-pointer flex-1">
+                        Override with custom value
+                      </Label>
+                      {useCaseFormData.isManDaysManualOverride && (
+                        <Input
+                          type="number"
+                          step="0.5"
+                          min="0.5"
+                          value={useCaseFormData.manDaysOverride ?? ""}
+                          onChange={(e) =>
+                            setUseCaseFormData({
+                              ...useCaseFormData,
+                              manDaysOverride: parseFloat(e.target.value) || 0
+                            })
+                          }
+                          className="w-24"
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Status and Priority */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select
+                        value={useCaseFormData.status}
+                        onValueChange={(value: UseCaseStatus) => setUseCaseFormData({ ...useCaseFormData, status: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="high-level definition">High-level Definition</SelectItem>
+                          <SelectItem value="groomed">Groomed</SelectItem>
+                          <SelectItem value="defined">Defined</SelectItem>
+                          <SelectItem value="in development">In Development</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Priority</Label>
+                      <Select
+                        value={useCaseFormData.priority}
+                        onValueChange={(value: Priority) => setUseCaseFormData({ ...useCaseFormData, priority: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Assigned Developers */}
+                  <div className="space-y-2">
+                    <Label>Assigned Developers</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {data.developers.map((dev) => (
+                        <div
+                          key={dev.id}
+                          className={cn(
+                            "flex items-center gap-2 rounded-lg border p-2 cursor-pointer transition-colors",
+                            useCaseFormData.assignedDeveloperIds.includes(dev.id)
+                              ? "bg-primary/10 border-primary"
+                              : "hover:bg-muted"
+                          )}
+                          onClick={() => {
+                            const ids = useCaseFormData.assignedDeveloperIds
+                            if (ids.includes(dev.id)) {
+                              setUseCaseFormData({
+                                ...useCaseFormData,
+                                assignedDeveloperIds: ids.filter((id) => id !== dev.id)
+                              })
+                            } else {
+                              setUseCaseFormData({
+                                ...useCaseFormData,
+                                assignedDeveloperIds: [...ids, dev.id]
+                              })
+                            }
+                          }}
+                        >
+                          <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-[10px] font-bold text-blue-700 dark:text-blue-300">
+                            {getDeveloperInitials(dev.name)}
+                          </div>
+                          <span className="text-sm">{dev.name}</span>
+                          {useCaseFormData.assignedDeveloperIds.includes(dev.id) && (
+                            <span className="text-primary">✓</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Start Date */}
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-start-date">Start Date</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="edit-start-date"
+                        type="date"
+                        value={useCaseFormData.startDate}
+                        onChange={(e) => setUseCaseFormData({ ...useCaseFormData, startDate: e.target.value })}
+                      />
+                      {useCaseFormData.startDate && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setUseCaseFormData({ ...useCaseFormData, startDate: "" })}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Timeline Info (Read-only) */}
+                  <div className="rounded-lg border bg-muted/30 p-4">
+                    <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Calculated Timeline
+                    </h4>
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Start</span>
+                        <p className="font-medium">
+                          {selectedTimeline.startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">End</span>
+                        <p className="font-medium">
+                          {selectedTimeline.endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Duration</span>
+                        <p className="font-medium">{selectedTimeline.calendarDays} calendar days</p>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                {/* Progress Tab */}
+                <TabsContent value="progress" className="space-y-4 mt-4">
+                  {/* Schedule Status */}
+                  {(() => {
+                    const status = getScheduleStatus(selectedUseCase, selectedTimeline.endDate)
+                    const statusInfo = getScheduleStatusInfo(status)
+                    const expected = calculateExpectedProgress(
+                      selectedUseCase.startDate,
+                      selectedTimeline.endDate,
+                      selectedUseCase.manDays
+                    )
+                    return (
+                      <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+                        <div className="space-y-1">
+                          <Badge className={cn(statusInfo.bgColor, statusInfo.color, "border", statusInfo.borderColor)}>
+                            {statusInfo.label}
+                          </Badge>
+                          <p className="text-sm text-muted-foreground">
+                            Expected: {formatProgress(expected)}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-3xl font-bold">{formatProgress(useCaseFormData.progressPercent)}</p>
+                          <p className="text-sm text-muted-foreground">Current Progress</p>
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Progress Slider */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Progress</Label>
+                      <span className="text-sm text-muted-foreground">{useCaseFormData.progressPercent}%</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <Slider
+                        value={[useCaseFormData.progressPercent]}
+                        onValueChange={(values) => setUseCaseFormData({ ...useCaseFormData, progressPercent: values[0] })}
+                        max={100}
+                        step={5}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        value={useCaseFormData.progressPercent}
+                        onChange={(e) => setUseCaseFormData({
+                          ...useCaseFormData,
+                          progressPercent: Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
+                        })}
+                        className="w-20"
+                        min={0}
+                        max={100}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Quick Progress Buttons */}
+                  <div className="flex gap-2">
+                    {[0, 25, 50, 75, 100].map((pct) => (
+                      <Button
+                        key={pct}
+                        type="button"
+                        variant={useCaseFormData.progressPercent === pct ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setUseCaseFormData({ ...useCaseFormData, progressPercent: pct })}
+                        className="flex-1"
+                      >
+                        {pct}%
+                      </Button>
+                    ))}
+                  </div>
+
+                  {/* Progress Notes */}
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-progress-notes">Progress Notes</Label>
+                    <Textarea
+                      id="edit-progress-notes"
+                      value={useCaseFormData.progressNotes}
+                      onChange={(e) => setUseCaseFormData({ ...useCaseFormData, progressNotes: e.target.value })}
+                      placeholder="Add notes about progress, blockers, or updates..."
+                      rows={4}
+                    />
+                  </div>
+
+                  {/* Last Updated */}
+                  {selectedUseCase.lastProgressUpdate && (
+                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      Last updated: {new Date(selectedUseCase.lastProgressUpdate).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit"
+                      })}
+                    </p>
+                  )}
+
+                  {/* Timeline Summary */}
+                  <div className="rounded-lg border bg-muted/30 p-4">
+                    <h4 className="text-sm font-medium mb-3">Timeline Summary</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Start Date</span>
+                        <p className="font-medium">
+                          {selectedTimeline.startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">End Date</span>
+                        <p className="font-medium">
+                          {selectedTimeline.endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Effort</span>
+                        <p className="font-medium">{selectedUseCase.manDays} man-days</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Team Velocity</span>
+                        <p className="font-medium">{selectedTimeline.effectiveCapacity.toFixed(1)} man-days/day</p>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+              </Tabs>
+
+              {/* Save Button */}
+              {setData && (
+                <div className="flex justify-end gap-2 pt-4 border-t mt-4">
+                  <Button variant="outline" onClick={closeUseCaseDetails}>
+                    Cancel
+                  </Button>
+                  <Button onClick={saveUseCaseFromDialog} disabled={isSaving} className="gap-2">
+                    <Save className="h-4 w-4" />
+                    {isSaving ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
