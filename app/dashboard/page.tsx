@@ -13,6 +13,7 @@ import { DeveloperPlanning } from "./_components/developer-planning"
 import { EffortConfig } from "./_components/effort-config"
 import { EstimationGuide } from "./_components/estimation-guide"
 import { ProgressReport } from "./_components/progress-report"
+import { IdeasManagement } from "./_components/ideas-management"
 import { EffortConfigProvider } from "@/lib/effort-config-context"
 import type { PlanningData } from "@/types/planning-types"
 import { readPlanningDataWithFallback, writePlanningDataWithFallback } from "@/lib/storage-db"
@@ -30,6 +31,7 @@ type ViewType =
   | "gantt"
   | "planning"
   | "progress"
+  | "ideas"
   | "settings"
   | "guide"
 
@@ -137,6 +139,9 @@ export default function DashboardPage() {
             )}
             {currentView === "progress" && data && (
               <ProgressReport data={data} setData={setData} />
+            )}
+            {currentView === "ideas" && data && (
+              <IdeasManagement data={data} setData={setData} />
             )}
             {currentView === "settings" && data && (
               <EffortConfig data={data} setData={setData} />

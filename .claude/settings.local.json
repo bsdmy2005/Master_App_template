@@ -10,7 +10,13 @@
       "Bash(npx eslint:*)",
       "Bash(find:*)",
       "Bash(npx shadcn@latest add slider:*)",
-      "Bash(npx shadcn@latest add tabs:*)"
+      "Bash(npx shadcn@latest add tabs:*)",
+      "Bash(npx drizzle-kit push:*)",
+      "Bash(npm install:*)",
+      "Bash(npx drizzle-kit generate)",
+      "Bash(npx drizzle-kit:*)",
+      "Bash(npx shadcn@latest add alert-dialog:*)",
+      "Bash(npx supabase:*)"
     ]
   }
 }

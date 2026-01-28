@@ -4,4 +4,5 @@ export * from "./use-cases-schema"
 export * from "./tasks-schema"
 export * from "./dependencies-schema"
 export * from "./effort-config-schema"
+export * from "./ideas-schema"
 

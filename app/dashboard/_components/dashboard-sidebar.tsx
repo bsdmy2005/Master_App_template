@@ -11,7 +11,8 @@ import {
   GitBranch,
   Settings,
   BookOpen,
-  ClipboardCheck
+  ClipboardCheck,
+  Lightbulb
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -25,6 +26,7 @@ type ViewType =
   | "gantt"
   | "planning"
   | "progress"
+  | "ideas"
   | "settings"
   | "guide"
 
@@ -42,6 +44,7 @@ const navigation = [
   { id: "gantt", label: "Gantt Chart", icon: GanttChartSquare },
   { id: "planning", label: "Planning", icon: TrendingUp },
   { id: "progress", label: "Progress Report", icon: ClipboardCheck },
+  { id: "ideas", label: "Ideas Backlog", icon: Lightbulb },
   { id: "settings", label: "Effort Config", icon: Settings },
   { id: "guide", label: "Estimation Guide", icon: BookOpen }
 ] as const

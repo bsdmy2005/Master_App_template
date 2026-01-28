@@ -36,6 +36,20 @@
       "when": 1768455824307,
       "tag": "0004_yummy_daimon_hellstrom",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1769531822209,
+      "tag": "0005_certain_firestar",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1769572839521,
+      "tag": "0006_cool_titanium_man",
+      "breakpoints": true
     }
   ]
 }
