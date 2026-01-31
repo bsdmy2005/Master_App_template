@@ -1,44 +1,30 @@
 # Master App Template
 
-A clean, production-ready Next.js 15 scaffolding template for rapid prototyping. Perfect for quickly spinning up new projects with authentication, database, email, and a rich text editor already configured.
+Next.js 15 starter with auth, database, email, and rich text editor configured.
 
-## Features
+## What's Included
 
-- **Authentication**: [Clerk](https://clerk.com) for secure user management
-- **Database**: [Supabase](https://supabase.com) with [Drizzle ORM](https://orm.drizzle.team)
-- **Email**: [Postmark](https://postmarkapp.com) for transactional emails
-- **Rich Text Editor**: [Tiptap](https://tiptap.dev) with formatting toolbar
-- **UI Components**: [Shadcn UI](https://ui.shadcn.com) + Tailwind CSS
-- **TypeScript**: Full type safety throughout
-- **Dark Mode**: Theme switching with next-themes
+- **Clerk** - Authentication (sign-in, sign-up, protected routes)
+- **Supabase + Drizzle** - PostgreSQL database with type-safe ORM
+- **Postmark** - Transactional email
+- **Tiptap** - Rich text editor
+- **Shadcn UI** - Component library
+- **Dark mode** - Theme switching
 
-## Quick Start
+## Setup
 
 ```bash
-# Clone the template
-git clone https://github.com/your-repo/master-app-template.git my-project
-cd my-project
-
-# Install dependencies
 npm install
-
-# Set up environment variables
 cp .env.example .env.local
-# Edit .env.local with your credentials
-
-# Push database schema
+# Fill in your credentials
 npm run db:push
-
-# Start development server
 npm run dev
 ```
 
 ## Environment Variables
 
-Create a `.env.local` file with:
-
 ```env
-# Clerk Authentication
+# Clerk
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
 NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
@@ -46,134 +32,98 @@ NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
 NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
 NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
 
-# Database (Supabase)
+# Supabase
 DATABASE_URL=postgresql://...
 
-# Email (Postmark) - Optional
+# Postmark (optional)
 POSTMARK_API_TOKEN=...
 POSTMARK_FROM_EMAIL=noreply@yourdomain.com
 ```
 
-## Project Structure
+## Structure
 
 ```
-├── app/
-│   ├── (unauthenticated)/     # Public routes
-│   │   ├── (auth)/            # Sign-in, Sign-up pages
-│   │   └── (marketing)/       # Landing page, features
-│   ├── dashboard/             # Protected app routes
-│   │   ├── editor/            # Tiptap editor demo
-│   │   ├── data/              # Database example
-│   │   ├── email/             # Email demo
-│   │   └── settings/          # User settings
-│   └── api/                   # API routes
-├── actions/                   # Server actions
-│   ├── posts-actions.ts       # Example CRUD actions
-│   └── users-actions.ts       # User profile actions
-├── components/
-│   ├── ui/                    # Shadcn UI components
-│   ├── editor/                # Tiptap editor
-│   └── utility/               # Theme toggle, etc.
-├── db/
-│   ├── db.ts                  # Database connection
-│   └── schema/                # Drizzle schemas
-├── lib/
-│   ├── email.ts               # Postmark utilities
-│   └── utils.ts               # Helper functions
-├── types/
-│   └── actions-types.ts       # ActionState type
-└── docs/                      # Documentation
-    ├── ACTIONS_GUIDE.md
-    ├── QUERIES_GUIDE.md
-    ├── API_GUIDE.md
-    └── DEPLOYMENT.md
+app/
+├── page.tsx                 # Home (redirects to dashboard if signed in)
+├── (unauthenticated)/
+│   └── (auth)/              # /sign-in, /sign-up
+└── dashboard/               # Protected routes
+    ├── page.tsx             # Main dashboard
+    ├── editor/              # Tiptap demo
+    ├── data/                # Database demo
+    ├── email/               # Email demo
+    └── settings/            # User settings
+
+actions/                     # Server actions (mutations)
+db/schema/                   # Drizzle table schemas
+lib/email.ts                 # Postmark helpers
+components/editor/           # Tiptap editor component
 ```
 
 ## Commands
 
 ```bash
-# Development
-npm run dev          # Start dev server with Turbopack
-npm run build        # Build for production
-npm run start        # Start production server
-
-# Code Quality
-npm run lint         # Run ESLint
-npm run lint:fix     # Fix linting issues
-npm run types        # Type check
-npm run clean        # Lint + format
-
-# Database
-npm run db:push      # Push schema to database
-npm run db:generate  # Generate migrations
-npm run db:migrate   # Run migrations
-npm run db:studio    # Open Drizzle Studio
-
-# Testing
-npm run test         # Run all tests
-npm run test:unit    # Run unit tests
-npm run test:e2e     # Run e2e tests
+npm run dev           # Start dev server
+npm run build         # Production build
+npm run db:push       # Push schema to database
+npm run db:studio     # Open Drizzle Studio
+npm run clean         # Lint + format
+npm run types         # Type check
 ```
 
-## Documentation
-
-- [Server Actions Guide](./docs/ACTIONS_GUIDE.md) - CRUD patterns with ActionState
-- [Database Queries Guide](./docs/QUERIES_GUIDE.md) - Drizzle ORM usage
-- [API Routes Guide](./docs/API_GUIDE.md) - Webhooks and external integrations
-- [Deployment Guide](./docs/DEPLOYMENT.md) - Production deployment
-
-## Adding New Features
-
-### 1. Add a Database Table
+## Adding a Table
 
 ```typescript
-// db/schema/my-table-schema.ts
+// db/schema/things-schema.ts
 import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core"
 
-export const myTable = pgTable("my_table", {
+export const things = pgTable("things", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull()
 })
-
-// Export from db/schema/index.ts
-export * from "./my-table-schema"
 ```
 
-### 2. Create Server Actions
+Then export from `db/schema/index.ts` and run `npm run db:push`.
+
+## Server Actions
+
+All mutations use `ActionState<T>` for consistent responses:
 
 ```typescript
-// actions/my-table-actions.ts
+// actions/things-actions.ts
 "use server"
 
 import { db } from "@/db/db"
-import { myTable } from "@/db/schema"
+import { things } from "@/db/schema"
 import type { ActionState } from "@/types/actions-types"
 
-export async function createItemAction(name: string): Promise<ActionState<Item>> {
-  // Implementation...
+export async function createThing(name: string): Promise<ActionState<Thing>> {
+  try {
+    const [item] = await db.insert(things).values({ name }).returning()
+    return { isSuccess: true, message: "Created", data: item }
+  } catch {
+    return { isSuccess: false, message: "Failed to create" }
+  }
 }
 ```
 
-### 3. Add UI Components
+## Email
 
-```bash
-# Add Shadcn components
-npx shadcn@latest add button card dialog
+```typescript
+import { sendEmail } from "@/lib/email"
+
+await sendEmail({
+  to: "user@example.com",
+  subject: "Hello",
+  textBody: "Hello world"
+})
 ```
 
-## Tech Stack
+## Docs
 
-- **Framework**: Next.js 15 (App Router)
-- **Language**: TypeScript 5
-- **Auth**: Clerk
-- **Database**: PostgreSQL + Drizzle ORM
-- **Styling**: Tailwind CSS 4
-- **UI**: Shadcn UI + Radix UI
-- **Email**: Postmark
-- **Editor**: Tiptap
-- **Animations**: Framer Motion
-
-## License
-
-MIT
+See `docs/` for detailed guides:
+- `ACTIONS_GUIDE.md` - Server action patterns
+- `QUERIES_GUIDE.md` - Database queries
+- `API_GUIDE.md` - API routes
+- `DEPLOYMENT.md` - Deployment steps

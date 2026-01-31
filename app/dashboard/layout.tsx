@@ -1,31 +1,5 @@
-import { UserButton } from "@clerk/nextjs"
 import { currentUser } from "@clerk/nextjs/server"
-import Link from "next/link"
-import {
-  Home,
-  FileText,
-  Settings,
-  Menu,
-  PenSquare,
-  Database,
-  Mail
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
-import { ThemeToggle } from "@/components/utility/theme-toggle"
-
-const navigation = [
-  { name: "Overview", href: "/dashboard", icon: Home },
-  { name: "Editor Demo", href: "/dashboard/editor", icon: PenSquare },
-  { name: "Data Example", href: "/dashboard/data", icon: Database },
-  { name: "Email Demo", href: "/dashboard/email", icon: Mail },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings }
-]
+import { DashboardHeader } from "./_components/dashboard-header"
 
 export default async function DashboardLayout({
   children
@@ -33,64 +7,11 @@ export default async function DashboardLayout({
   children: React.ReactNode
 }) {
   const user = await currentUser()
+  const userName = user?.firstName || user?.emailAddresses[0]?.emailAddress
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex h-14 items-center px-4 md:px-6">
-          {/* Mobile menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild className="md:hidden">
-              <Button variant="ghost" size="icon">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle menu</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-48">
-              {navigation.map((item) => (
-                <DropdownMenuItem key={item.name} asChild>
-                  <Link href={item.href} className="flex items-center gap-2">
-                    <item.icon className="h-4 w-4" />
-                    {item.name}
-                  </Link>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-            <FileText className="h-5 w-5" />
-            <span className="hidden md:inline">Master Template</span>
-          </Link>
-
-          {/* Desktop navigation */}
-          <nav className="ml-6 hidden items-center gap-1 md:flex">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-              >
-                <item.icon className="h-4 w-4" />
-                {item.name}
-              </Link>
-            ))}
-          </nav>
-
-          {/* Right side */}
-          <div className="ml-auto flex items-center gap-2">
-            <ThemeToggle />
-            <span className="hidden text-sm text-muted-foreground md:inline">
-              {user?.firstName || user?.emailAddresses[0]?.emailAddress}
-            </span>
-            <UserButton afterSignOutUrl="/" />
-          </div>
-        </div>
-      </header>
-
-      {/* Main content */}
+      <DashboardHeader userName={userName} />
       <main className="flex-1">{children}</main>
     </div>
   )

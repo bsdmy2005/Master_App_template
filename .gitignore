@@ -52,3 +52,6 @@ dist/
 logs
 *.log
 
+
+# clerk configuration (can include secrets)
+/.clerk/

@@ -5,6 +5,7 @@ import StarterKit from "@tiptap/starter-kit"
 import Heading from "@tiptap/extension-heading"
 import BulletList from "@tiptap/extension-bullet-list"
 import OrderedList from "@tiptap/extension-ordered-list"
+import ListItem from "@tiptap/extension-list-item"
 import Placeholder from "@tiptap/extension-placeholder"
 import {
   Bold,
@@ -36,17 +37,20 @@ export function TiptapEditor({
   editable = true
 }: TiptapEditorProps) {
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({
         heading: false,
         bulletList: false,
-        orderedList: false
+        orderedList: false,
+        listItem: false
       }),
       Heading.configure({
         levels: [2, 3]
       }),
       BulletList,
       OrderedList,
+      ListItem,
       Placeholder.configure({
         placeholder
       })
