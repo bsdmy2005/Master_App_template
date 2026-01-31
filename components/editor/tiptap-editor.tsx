@@ -12,6 +12,7 @@ import {
   Italic,
   List,
   ListOrdered,
+  Heading1,
   Heading2,
   Heading3,
   Undo,
@@ -46,11 +47,23 @@ export function TiptapEditor({
         listItem: false
       }),
       Heading.configure({
-        levels: [2, 3]
+        levels: [1, 2, 3]
       }),
-      BulletList,
-      OrderedList,
-      ListItem,
+      BulletList.configure({
+        HTMLAttributes: {
+          class: "list-disc"
+        }
+      }),
+      OrderedList.configure({
+        HTMLAttributes: {
+          class: "list-decimal"
+        }
+      }),
+      ListItem.configure({
+        HTMLAttributes: {
+          class: "leading-normal"
+        }
+      }),
       Placeholder.configure({
         placeholder
       })
@@ -104,6 +117,21 @@ export function TiptapEditor({
 
           <div className="mx-1 h-6 w-px bg-border" />
 
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              editor.chain().focus().toggleHeading({ level: 1 }).run()
+            }
+            className={cn(
+              "h-8 w-8 p-0",
+              editor.isActive("heading", { level: 1 }) &&
+                "bg-accent text-accent-foreground"
+            )}
+            title="Heading 1"
+          >
+            <Heading1 className="h-4 w-4" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"

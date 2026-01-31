@@ -18,6 +18,59 @@ import type { ActionState } from "@/types/actions-types"
 // ============================================================================
 
 /**
+ * Ensure a user profile exists for the given Clerk user
+ * Creates a new profile if one doesn't exist, otherwise returns the existing one
+ * Called automatically from the dashboard layout on every page load
+ */
+export async function ensureUserProfileExistsAction(
+  clerkId: string,
+  initialData?: { displayName?: string; avatarUrl?: string }
+): Promise<ActionState<UserProfile>> {
+  try {
+    if (!db) {
+      return { isSuccess: false, message: "Database not configured" }
+    }
+
+    // Check if profile already exists
+    const [existingProfile] = await db
+      .select()
+      .from(userProfiles)
+      .where(eq(userProfiles.clerkId, clerkId))
+
+    if (existingProfile) {
+      return {
+        isSuccess: true,
+        message: "Profile exists",
+        data: existingProfile
+      }
+    }
+
+    // Create new profile
+    const [newProfile] = await db
+      .insert(userProfiles)
+      .values({
+        clerkId,
+        displayName: initialData?.displayName,
+        avatarUrl: initialData?.avatarUrl
+      })
+      .returning()
+
+    return {
+      isSuccess: true,
+      message: "Profile created",
+      data: newProfile
+    }
+  } catch (error) {
+    console.error("Error ensuring user profile exists:", error)
+    return {
+      isSuccess: false,
+      message:
+        error instanceof Error ? error.message : "Failed to ensure profile"
+    }
+  }
+}
+
+/**
  * Create or update a user profile
  * Use this when a user signs up or updates their profile
  */
