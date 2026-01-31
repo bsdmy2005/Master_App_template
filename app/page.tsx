@@ -9,7 +9,8 @@ import {
   PenSquare,
   Moon,
   Palette,
-  ArrowRight
+  ArrowRight,
+  HardDrive
 } from "lucide-react"
 
 const features = [
@@ -19,9 +20,14 @@ const features = [
     icon: Shield
   },
   {
-    name: "Supabase + Drizzle",
+    name: "Render + Drizzle",
     description: "PostgreSQL database with type-safe ORM. Schema push and migrations.",
     icon: Database
+  },
+  {
+    name: "Cloudflare R2 Storage",
+    description: "Private file storage with presigned URL access control.",
+    icon: HardDrive
   },
   {
     name: "Postmark Email",
@@ -34,14 +40,9 @@ const features = [
     icon: PenSquare
   },
   {
-    name: "Shadcn UI",
-    description: "Pre-built accessible components. Easy to customize.",
+    name: "Shadcn UI + Dark Mode",
+    description: "Pre-built components with theme switching.",
     icon: Palette
-  },
-  {
-    name: "Dark Mode",
-    description: "Theme switching with system preference detection.",
-    icon: Moon
   }
 ]
 
@@ -124,11 +125,12 @@ export default async function HomePage() {
 ├── dashboard/         # Protected routes
 │   ├── editor/        # Tiptap demo
 │   ├── data/          # Database demo
+│   ├── storage/       # File upload demo
 │   └── email/         # Email demo
 actions/               # Server actions
 db/schema/             # Database tables
-lib/email.ts           # Postmark helpers
-components/editor/     # Tiptap component`}
+lib/storage.ts         # R2 helpers
+lib/email.ts           # Postmark helpers`}
             </pre>
           </div>
         </div>

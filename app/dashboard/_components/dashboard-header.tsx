@@ -9,7 +9,8 @@ import {
   Menu,
   PenSquare,
   Database,
-  Mail
+  Mail,
+  HardDrive
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,6 +25,7 @@ const navigation = [
   { name: "Overview", href: "/dashboard", icon: Home },
   { name: "Editor Demo", href: "/dashboard/editor", icon: PenSquare },
   { name: "Data Example", href: "/dashboard/data", icon: Database },
+  { name: "Storage Demo", href: "/dashboard/storage", icon: HardDrive },
   { name: "Email Demo", href: "/dashboard/email", icon: Mail },
   { name: "Settings", href: "/dashboard/settings", icon: Settings }
 ]

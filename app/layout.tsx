@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Master App Template",
   description:
-    "A clean Next.js scaffolding template with Clerk auth, Supabase database, Postmark email, and Tiptap editor"
+    "A clean Next.js scaffolding template with Clerk auth, Render PostgreSQL, Cloudflare R2 storage, Postmark email, and Tiptap editor"
 }
 
 export default function RootLayout({

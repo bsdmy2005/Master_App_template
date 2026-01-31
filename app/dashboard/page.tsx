@@ -2,7 +2,7 @@ import { currentUser } from "@clerk/nextjs/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { ArrowRight, PenSquare, Database, Mail, BookOpen } from "lucide-react"
+import { ArrowRight, PenSquare, Database, Mail, HardDrive, BookOpen } from "lucide-react"
 
 export default async function DashboardPage() {
   const user = await currentUser()
@@ -23,18 +23,18 @@ export default async function DashboardPage() {
       color: "text-green-500"
     },
     {
+      title: "File Storage",
+      description: "Upload files to Cloudflare R2 with access control",
+      icon: HardDrive,
+      href: "/dashboard/storage",
+      color: "text-cyan-500"
+    },
+    {
       title: "Email Integration",
       description: "Learn how to send emails with Postmark",
       icon: Mail,
       href: "/dashboard/email",
       color: "text-purple-500"
-    },
-    {
-      title: "Documentation",
-      description: "Guides for actions, queries, and API patterns",
-      icon: BookOpen,
-      href: "/docs",
-      color: "text-orange-500"
     }
   ]
 
@@ -70,7 +70,7 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              Drizzle ORM with Supabase
+              Drizzle ORM with Render PostgreSQL
             </p>
           </CardContent>
         </Card>

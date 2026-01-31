@@ -42,11 +42,13 @@ This is a Next.js 15 Master App Template using the App Router with clear separat
   - `editor` - Tiptap editor demo
   - `data` - Database example
   - `email` - Email demo
+  - `storage` - File upload demo (R2)
   - `settings` - User settings
 
 ### Key Patterns
 - **Server Actions** in `/actions` for data mutations with ActionState return type
-- **Database Schema** in `/db/schema` using Drizzle ORM with PostgreSQL (Supabase)
+- **Database Schema** in `/db/schema` using Drizzle ORM with PostgreSQL (Render)
+- **Object Storage** via Cloudflare R2 (private, access-controlled via presigned URLs) in `/lib/storage.ts`
 - **UI Components** in `/components/ui` from Shadcn UI library
 - **Authentication** handled by Clerk middleware with protected route groups
 - **Email** via Postmark with utilities in `/lib/email.ts`
@@ -56,11 +58,16 @@ This is a Next.js 15 Master App Template using the App Router with clear separat
 1. Authentication state managed by Clerk (`@clerk/nextjs`)
 2. User data optionally extended in PostgreSQL via Drizzle ORM
 3. Server actions return `ActionState<T>` for consistent error handling
-4. Email notifications sent via Postmark
+4. File uploads stored in Cloudflare R2, metadata tracked in database
+5. Email notifications sent via Postmark
 
 ### Environment Variables Required
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` - Clerk public key
 - `CLERK_SECRET_KEY` - Clerk secret key
-- `DATABASE_URL` - PostgreSQL connection string (Supabase)
+- `DATABASE_URL` - PostgreSQL connection string (Render)
+- `R2_ACCESS_KEY_ID` - Cloudflare R2 access key
+- `R2_SECRET_ACCESS_KEY` - Cloudflare R2 secret key
+- `R2_ENDPOINT` - Cloudflare R2 endpoint URL
+- `R2_BUCKET_NAME` - Cloudflare R2 bucket name
 - `POSTMARK_API_TOKEN` - Postmark API token (optional)
 - `POSTMARK_FROM_EMAIL` - Verified sender email (optional)

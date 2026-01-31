@@ -5,9 +5,10 @@ This guide covers deploying the Master App Template to production.
 ## Prerequisites
 
 1. A Vercel account (recommended) or other Next.js hosting
-2. A Supabase project for the database
-3. A Clerk application for authentication
-4. A Postmark account for email (optional)
+2. A Render PostgreSQL database
+3. A Cloudflare R2 bucket for object storage
+4. A Clerk application for authentication
+5. A Postmark account for email (optional)
 
 ## Environment Variables
 
@@ -25,26 +26,34 @@ NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
 # Optional: Clerk webhook secret for syncing user data
 CLERK_WEBHOOK_SECRET=whsec_...
 
-# Database (Supabase)
-DATABASE_URL=postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres
+# Database (Render PostgreSQL)
+DATABASE_URL=postgresql://[USER]:[PASSWORD]@[HOST].frankfurt-postgres.render.com/[DATABASE]
+
+# Object Storage (Cloudflare R2)
+R2_ACCESS_KEY_ID=your-access-key-id
+R2_SECRET_ACCESS_KEY=your-secret-access-key
+R2_ENDPOINT=https://[ACCOUNT-ID].r2.cloudflarestorage.com
+R2_BUCKET_NAME=your-bucket-name
+R2_PUBLIC_URL=https://pub-your-bucket-id.r2.dev
 
 # Email (Postmark)
 POSTMARK_API_TOKEN=...
 POSTMARK_FROM_EMAIL=noreply@yourdomain.com
 ```
 
-## Supabase Setup
+## Render PostgreSQL Setup
 
-### 1. Create a Supabase Project
+### 1. Create a Render PostgreSQL Database
 
-1. Go to [supabase.com](https://supabase.com) and create a new project
-2. Note your project URL and connection string
+1. Go to [render.com](https://render.com) and create a new PostgreSQL database
+2. Choose your plan (free tier available for development)
+3. Select your region (e.g., Frankfurt for EU)
 
 ### 2. Get Database URL
 
-1. In Supabase dashboard, go to Settings > Database
-2. Find "Connection string" under "Connection Pooling"
-3. Copy the URI and replace `[YOUR-PASSWORD]` with your database password
+1. In Render dashboard, go to your PostgreSQL instance
+2. Click "Connect" and copy the "External Database URL"
+3. This is your `DATABASE_URL`
 
 ### 3. Run Migrations
 
@@ -55,6 +64,30 @@ DATABASE_URL=your-production-url npm run db:push
 # Or run migrations
 DATABASE_URL=your-production-url npm run db:migrate
 ```
+
+## Cloudflare R2 Setup
+
+### 1. Create an R2 Bucket
+
+1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com) > R2
+2. Create a new bucket (e.g., `master-app-storage`)
+3. Note your bucket name
+
+### 2. Create R2 API Token
+
+1. In R2, click "Manage R2 API Tokens"
+2. Create a new API token with "Object Read & Write" permissions
+3. Copy the following credentials:
+   - Access Key ID → `R2_ACCESS_KEY_ID`
+   - Secret Access Key → `R2_SECRET_ACCESS_KEY`
+   - Endpoint URL → `R2_ENDPOINT`
+
+### 3. Configure Public Access (Optional)
+
+For public file URLs:
+1. In your bucket settings, enable "R2.dev subdomain"
+2. Copy the public URL to `R2_PUBLIC_URL`
+3. Alternatively, configure a custom domain
 
 ## Clerk Setup
 
@@ -127,6 +160,7 @@ git push origin main
 
 - [ ] Test authentication flow (sign up, sign in, sign out)
 - [ ] Verify database connection (check data pages)
+- [ ] Test file uploads to R2
 - [ ] Test email sending (if configured)
 - [ ] Check Clerk webhook (if configured)
 - [ ] Verify protected routes redirect to sign-in
@@ -153,10 +187,15 @@ git push origin main
 - Enable Analytics in project settings
 - Set up error tracking with Sentry (optional)
 
-### Supabase
+### Render
 
-- Monitor database health in Supabase dashboard
-- Set up alerts for connection limits
+- Monitor database health in Render dashboard
+- Set up alerts for connection usage
+
+### Cloudflare
+
+- Monitor R2 usage in Cloudflare dashboard
+- Set up alerts for storage limits
 
 ### Postmark
 
@@ -168,8 +207,15 @@ git push origin main
 ### Database Connection Issues
 
 1. Check `DATABASE_URL` is correct
-2. Verify IP allowlist in Supabase (if enabled)
-3. Check connection pooling settings
+2. Verify SSL settings (Render requires SSL by default)
+3. Check connection string format
+
+### R2 Storage Issues
+
+1. Verify API credentials are correct
+2. Check bucket name matches `R2_BUCKET_NAME`
+3. Ensure CORS is configured for your domain
+4. Check file size limits
 
 ### Authentication Issues
 

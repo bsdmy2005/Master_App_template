@@ -16,7 +16,6 @@
       "Bash(npx drizzle-kit generate)",
       "Bash(npx drizzle-kit:*)",
       "Bash(npx shadcn@latest add alert-dialog:*)",
-      "Bash(npx supabase:*)",
       "Bash(tree:*)",
       "Bash(wc:*)",
       "Bash(ls:*)",
@@ -28,7 +27,11 @@
       "Bash(git commit:*)",
       "Bash(pkill:*)",
       "Bash(lsof:*)",
-      "Bash(xargs kill -9)"
+      "Bash(xargs kill -9)",
+      "Bash(grep:*)",
+      "Bash(/dev/null --include=*.ts --include=*.tsx)",
+      "Bash(npm run db:push:*)",
+      "Bash(timeout 15 npm run dev:*)"
     ]
   }
 }
