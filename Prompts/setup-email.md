@@ -1,128 +1,113 @@
-# Email Setup Instructions
+# Postmark Email Setup Guide
 
-Use this guide to set up email functionality for this project using Postmark.
+This guide helps you set up Postmark for transactional emails in this template.
 
-It uses Postmark for sending emails and Next.js API routes for handling email requests.
+## Prerequisites
 
-Write the complete code for every step. Do not get lazy. Write everything that is needed.
-
-Your goal is to completely finish the email setup.
-
-## Helpful Links
-
-If the user gets stuck, refer them to the following links:
-
-- [Postmark Documentation](https://postmarkapp.com/developer)
-- [Next.js API Routes](https://nextjs.org/docs/api-routes/introduction)
+1. A Postmark account at [postmarkapp.com](https://postmarkapp.com)
+2. A verified sender domain or email address
 
 ## Setup Steps
 
-1. Install the Postmark library:
+### 1. Get Your API Token
 
-```bash
-npm install postmark
+1. Log into Postmark
+2. Go to your Server > API Tokens
+3. Copy your Server API Token
+
+### 2. Configure Environment Variables
+
+Add to your `.env.local`:
+
+```env
+POSTMARK_API_TOKEN=your-server-api-token
+POSTMARK_FROM_EMAIL=noreply@yourdomain.com
 ```
 
-2. Create a new file `lib/sendEmailWithTemplate.ts` with the following content:
+### 3. Using the Email Utilities
+
+The template includes ready-to-use email utilities in `lib/email.ts`:
 
 ```typescript
-import { ServerClient } from 'postmark';
+import { sendEmail, sendTemplateEmail } from "@/lib/email"
 
-const client = new ServerClient(process.env.POSTMARK_SERVER_API_TOKEN as string);
+// Send a basic email
+const result = await sendEmail({
+  to: "user@example.com",
+  subject: "Welcome!",
+  htmlBody: "<h1>Welcome to our app!</h1>",
+  textBody: "Welcome to our app!"
+})
 
-interface SendEmailWithTemplateParams {
-  to: string;
-  templateId: string;
-  templateModel: Record<string, string>;
-}
-
-export async function sendEmailWithTemplate({
-  to,
-  templateId,
-  templateModel,
-}: SendEmailWithTemplateParams) {
-  try {
-    const response = await client.sendEmailWithTemplate({
-      From: 'sender@example.com',
-      To: to,
-      TemplateId: parseInt(templateId),
-      TemplateModel: templateModel,
-    });
-    return response;
-  } catch (error) {
-    console.error('Error sending email:', error);
-    throw error;
+// Send a templated email
+const result = await sendTemplateEmail({
+  to: "user@example.com",
+  templateAlias: "welcome",
+  templateModel: {
+    name: "John",
+    action_url: "https://app.example.com/verify"
   }
-}
+})
 ```
 
-3. Create a new API route file `app/api/postmark/SendRegularEmail/route.ts`:
+### 4. Create Postmark Templates (Optional)
+
+1. In Postmark, go to Templates
+2. Create templates with aliases like "welcome", "password-reset", etc.
+3. Use template variables like `{{name}}` in your templates
+4. Reference them by alias in `sendTemplateEmail()`
+
+### 5. Create a Server Action for Email
 
 ```typescript
-import { sendEmailWithTemplate } from '@/lib/sendEmailWithTemplate';
-import { getAllProfilesAction } from '@/actions/profiles-actions';
-import { NextResponse } from 'next/server';
-import { MessageSendingResponse } from 'postmark/dist/client/models';
+// actions/email-actions.ts
+"use server"
 
-export async function GET() {
-  try {
-    const users = await getAllProfilesAction(); // Fetch users from your database
+import { sendEmail } from "@/lib/email"
+import type { ActionState } from "@/types/actions-types"
 
-    const emailPromises = users?.data?.map((user) => {
-      if (!user.email) return Promise.resolve(null);
-      return sendEmailWithTemplate({
-        to: user.email,
-        templateId: process.env.POSTMARK_TEMPLATE_ID as string,
-        templateModel: { 
-          name: user.firstName || 'User',
-          email: user.email || '',
-        },
-      });
-    }).filter((promise): promise is Promise<MessageSendingResponse> => promise !== null);
+export async function sendWelcomeEmailAction(
+  email: string,
+  name: string
+): Promise<ActionState<{ messageId: string }>> {
+  const result = await sendEmail({
+    to: email,
+    subject: "Welcome to Our App!",
+    htmlBody: `<h1>Welcome, ${name}!</h1><p>We're glad you're here.</p>`,
+    textBody: `Welcome, ${name}! We're glad you're here.`,
+    tag: "welcome"
+  })
 
-    if (emailPromises) {
-      await Promise.all(emailPromises);
+  if (result.success) {
+    return {
+      isSuccess: true,
+      message: "Welcome email sent",
+      data: { messageId: result.messageId! }
     }
+  }
 
-    return NextResponse.json({ message: 'Scheduled emails sent successfully' }, { status: 200 });
-  } catch (error) {
-    console.error('Scheduled email error:', error);
-    return NextResponse.json({ error: 'Error sending scheduled emails' }, { status: 500 });
+  return {
+    isSuccess: false,
+    message: result.error || "Failed to send email"
   }
 }
 ```
 
-4. Update the `middleware.ts` file to allow access to the email API route:
+## Helpful Links
 
-```typescript
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+- [Postmark Documentation](https://postmarkapp.com/developer)
+- [Postmark Templates Guide](https://postmarkapp.com/developer/api/templates-api)
+- [Node.js Library](https://www.npmjs.com/package/postmark)
 
-const isProtectedRoute = createRouteMatcher(["/notes(.*)"]);
-const isPublicRoute = createRouteMatcher([
-  "/api/webhooks/clerk(.*)",
-  "/api/postmark/sendEmail"  // Add this line
-]);
+## Troubleshooting
 
-// ... rest of the middleware code ...
-```
+### Email not sending?
 
-5. Add the necessary environment variables to your `.env.local` file:
+1. Check that `POSTMARK_API_TOKEN` is set correctly
+2. Verify your sender domain/email in Postmark
+3. Check the Postmark Activity log for errors
 
-```
-POSTMARK_SERVER_API_TOKEN=your_postmark_server_api_token
-POSTMARK_TEMPLATE_ID=your_postmark_template_id
-```
+### Template not found?
 
-6. Create a Postmark template in your Postmark account and note down the template ID.
-
-7. Test the email functionality by making a GET request to `/api/postmark/SendRegularEmail`.
-
-## Important Notes
-
-- Make sure to replace 'sender@example.com' in the `sendEmailWithTemplate` function with your actual sender email address.
-- Ensure that your Postmark account is set up correctly and your server API token is valid.
-- The `getAllProfilesAction` function should be implemented to fetch user profiles from your database.
-- Always handle errors and edge cases in production environments.
-
-The email setup is now complete. You can now send emails to all users using the Postmark template.
+1. Ensure the template alias matches exactly (case-sensitive)
+2. Check that the template is in the same server as your API token

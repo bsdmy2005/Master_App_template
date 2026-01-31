@@ -16,7 +16,12 @@
       "Bash(npx drizzle-kit generate)",
       "Bash(npx drizzle-kit:*)",
       "Bash(npx shadcn@latest add alert-dialog:*)",
-      "Bash(npx supabase:*)"
+      "Bash(npx supabase:*)",
+      "Bash(tree:*)",
+      "Bash(wc:*)",
+      "Bash(ls:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nTransform to clean Master App Template scaffolding\n\nMajor cleanup and restructuring from a planning app to a reusable scaffolding template.\n\n## Removed\n- Planning app domain code \\(use cases, developers, tasks, ideas, dependencies\\)\n- Stripe payment references and unused confirmation page\n- Password-based authentication \\(replaced with Clerk\\)\n- 22 planning-specific dashboard components\n- All planning data schemas and migrations\n- Orphaned files \\(VB files, malformed filenames, planning docs\\)\n\n## Added\n- Clerk authentication with middleware and auth pages\n- Postmark email utilities and setup guide\n- Tiptap rich text editor component and demo page\n- Clean database schemas \\(users, posts\\) as examples\n- Server action patterns with ActionState type\n- Dashboard demo pages \\(editor, data, email, settings\\)\n- Dark mode theme toggle\n- Comprehensive documentation:\n  - docs/ACTIONS_GUIDE.md\n  - docs/QUERIES_GUIDE.md\n  - docs/API_GUIDE.md\n  - docs/DEPLOYMENT.md\n- .env.example with all required variables\n\n## Updated\n- package.json: added @clerk/nextjs, postmark, zod\n- Marketing pages: reflect actual features \\(Clerk, Supabase, Postmark, Tiptap\\)\n- README: complete rewrite for scaffolding use case\n- CLAUDE.md: updated for new architecture\n\nThis template now provides a clean foundation for rapid prototyping with:\n- Clerk for authentication\n- Supabase/Drizzle for database\n- Postmark for email\n- Tiptap for rich text editing\n- Shadcn UI for components\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }

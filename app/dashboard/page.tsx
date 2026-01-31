@@ -1,156 +1,134 @@
-"use client"
+import { currentUser } from "@clerk/nextjs/server"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
+import { ArrowRight, PenSquare, Database, Mail, BookOpen } from "lucide-react"
 
-import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
-import { DashboardSidebar } from "./_components/dashboard-sidebar"
-import { AggregateView } from "./_components/aggregate-view"
-import { DeveloperRepository } from "./_components/developer-repository"
-import { ClientManagement } from "./_components/client-management"
-import { DependencyManagement } from "./_components/dependency-management"
-import { TimelineView } from "./_components/timeline-view"
-import { GanttChartModern } from "./_components/gantt-chart-modern"
-import { DeveloperPlanning } from "./_components/developer-planning"
-import { EffortConfig } from "./_components/effort-config"
-import { EstimationGuide } from "./_components/estimation-guide"
-import { ProgressReport } from "./_components/progress-report"
-import { IdeasManagement } from "./_components/ideas-management"
-import { EffortConfigProvider } from "@/lib/effort-config-context"
-import type { PlanningData } from "@/types/planning-types"
-import { readPlanningDataWithFallback, writePlanningDataWithFallback } from "@/lib/storage-db"
-import { readPlanningData } from "@/lib/storage"
-import { parsePlanSummary } from "@/lib/seed-data"
-import { checkDatabaseAvailableAction } from "@/actions/db/db-actions"
-import { readPlanningDataAction, writePlanningDataAction } from "@/actions/db/planning-data-actions"
+export default async function DashboardPage() {
+  const user = await currentUser()
 
-type ViewType =
-  | "overview"
-  | "developers"
-  | "clients"
-  | "dependencies"
-  | "timeline"
-  | "gantt"
-  | "planning"
-  | "progress"
-  | "ideas"
-  | "settings"
-  | "guide"
-
-export default function DashboardPage() {
-  const [currentView, setCurrentView] = useState<ViewType>("overview")
-  const [data, setData] = useState<PlanningData | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    async function loadData() {
-      try {
-        let planningData: PlanningData | null = null
-
-        // Try to load from database first
-        const dbAvailable = await checkDatabaseAvailableAction()
-        if (dbAvailable) {
-          const dbResult = await readPlanningDataAction()
-          if (dbResult.isSuccess && dbResult.data) {
-            planningData = dbResult.data
-          }
-        }
-
-        // If no database data, try file system
-        if (!planningData) {
-          planningData = await readPlanningData()
-          
-          // If file system has data and database is available, migrate it
-          if (planningData && dbAvailable) {
-            const migrateResult = await writePlanningDataAction(planningData)
-            if (migrateResult.isSuccess) {
-              console.log("Data migrated from file system to database")
-            }
-          }
-        }
-
-        // If still no data exists, seed from markdown
-        if (!planningData || planningData.clients.length === 0) {
-          planningData = await parsePlanSummary()
-          // Write seeded data (to database if available, otherwise file system)
-          await writePlanningDataWithFallback(planningData)
-        }
-
-        setData(planningData)
-      } catch (error) {
-        console.error("Error loading planning data:", error)
-        // Fallback to file system
-        let planningData = await readPlanningData()
-        if (!planningData || planningData.clients.length === 0) {
-          planningData = await parsePlanSummary()
-          const { writePlanningData } = await import("@/lib/storage")
-          await writePlanningData(planningData)
-        }
-        setData(planningData)
-      } finally {
-        setIsLoading(false)
-      }
+  const features = [
+    {
+      title: "Rich Text Editor",
+      description: "Try the Tiptap editor with formatting, lists, and more",
+      icon: PenSquare,
+      href: "/dashboard/editor",
+      color: "text-blue-500"
+    },
+    {
+      title: "Database Example",
+      description: "See how to use Drizzle ORM with server actions",
+      icon: Database,
+      href: "/dashboard/data",
+      color: "text-green-500"
+    },
+    {
+      title: "Email Integration",
+      description: "Learn how to send emails with Postmark",
+      icon: Mail,
+      href: "/dashboard/email",
+      color: "text-purple-500"
+    },
+    {
+      title: "Documentation",
+      description: "Guides for actions, queries, and API patterns",
+      icon: BookOpen,
+      href: "/docs",
+      color: "text-orange-500"
     }
-    loadData()
-  }, [])
-
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    )
-  }
-
-  if (!data) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground">No data found</p>
-        </div>
-      </div>
-    )
-  }
+  ]
 
   return (
-    <EffortConfigProvider>
-      <div className="flex h-screen overflow-hidden">
-        <DashboardSidebar currentView={currentView} setCurrentView={setCurrentView} />
-        <main className="flex-1 overflow-y-auto">
-          <motion.div
-            key={currentView}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="h-full p-6"
-          >
-            {currentView === "overview" && data && <AggregateView data={data} />}
-            {currentView === "developers" && data && (
-              <DeveloperRepository data={data} setData={setData} />
-            )}
-            {currentView === "clients" && data && (
-              <ClientManagement data={data} setData={setData} />
-            )}
-            {currentView === "dependencies" && data && (
-              <DependencyManagement data={data} setData={setData} />
-            )}
-            {currentView === "timeline" && data && <TimelineView data={data} />}
-            {currentView === "gantt" && data && <GanttChartModern data={data} setData={setData} />}
-            {currentView === "planning" && data && (
-              <DeveloperPlanning data={data} setData={setData} />
-            )}
-            {currentView === "progress" && data && (
-              <ProgressReport data={data} setData={setData} />
-            )}
-            {currentView === "ideas" && data && (
-              <IdeasManagement data={data} setData={setData} />
-            )}
-            {currentView === "settings" && data && (
-              <EffortConfig data={data} setData={setData} />
-            )}
-            {currentView === "guide" && <EstimationGuide />}
-          </motion.div>
-        </main>
+    <div className="container mx-auto p-6 md:p-8">
+      {/* Welcome Section */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight">
+          Welcome back, {user?.firstName || "Developer"}!
+        </h1>
+        <p className="mt-2 text-muted-foreground">
+          This is your dashboard. Explore the template features below.
+        </p>
       </div>
-    </EffortConfigProvider>
+
+      {/* Quick Stats */}
+      <div className="mb-8 grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Authentication</CardDescription>
+            <CardTitle className="text-2xl text-green-500">Active</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">
+              Clerk authentication configured
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Database</CardDescription>
+            <CardTitle className="text-2xl text-blue-500">Ready</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">
+              Drizzle ORM with Supabase
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Email</CardDescription>
+            <CardTitle className="text-2xl text-purple-500">Configured</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">
+              Postmark integration ready
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Feature Cards */}
+      <h2 className="mb-4 text-xl font-semibold">Explore Features</h2>
+      <div className="grid gap-4 md:grid-cols-2">
+        {features.map((feature) => (
+          <Card key={feature.title} className="group transition-shadow hover:shadow-md">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <feature.icon className={`h-6 w-6 ${feature.color}`} />
+                <CardTitle className="text-lg">{feature.title}</CardTitle>
+              </div>
+              <CardDescription>{feature.description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="ghost" className="group-hover:bg-accent">
+                <Link href={feature.href} className="flex items-center gap-2">
+                  Explore
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Getting Started */}
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle>Getting Started</CardTitle>
+          <CardDescription>
+            Quick steps to customize this template for your project
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ol className="list-inside list-decimal space-y-2 text-sm text-muted-foreground">
+            <li>Update the database schema in <code className="rounded bg-muted px-1 py-0.5">db/schema/</code></li>
+            <li>Create server actions in <code className="rounded bg-muted px-1 py-0.5">actions/</code></li>
+            <li>Add API routes in <code className="rounded bg-muted px-1 py-0.5">app/api/</code></li>
+            <li>Customize UI components in <code className="rounded bg-muted px-1 py-0.5">components/</code></li>
+            <li>Configure Postmark for email in <code className="rounded bg-muted px-1 py-0.5">lib/email.ts</code></li>
+          </ol>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
-

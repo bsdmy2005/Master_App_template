@@ -17,11 +17,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run clean` - Run both lint:fix and format:write
 
 ### Database
-- `npx drizzle-kit push` - Push schema changes to database
-- `npx drizzle-kit generate` - Generate migration files
-- `npx drizzle-kit migrate` - Run migrations
-- `npx bun db/seed` - Seed database
-- `npx supabase start` - Start local Supabase instance
+- `npm run db:push` - Push schema changes to database
+- `npm run db:generate` - Generate migration files
+- `npm run db:migrate` - Run migrations
+- `npm run db:studio` - Open Drizzle Studio
 
 ### Testing
 - `npm run test` - Run all tests (unit + e2e)
@@ -33,31 +32,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture
 
-This is a Next.js 15 SaaS template using the App Router with clear separation between authenticated and unauthenticated routes.
+This is a Next.js 15 Master App Template using the App Router with clear separation between authenticated and unauthenticated routes.
 
 ### Route Structure
 - `/app/(unauthenticated)` - Public routes
   - `(marketing)` - Landing pages, pricing, features
-  - `(auth)` - Login and signup flows
-- `/app/(authenticated)` - Protected routes requiring Clerk auth
-  - `dashboard` - Main application with account, billing, support sections
-- `/app/api` - API routes including Stripe webhook handler
+  - `(auth)` - Sign-in and sign-up (Clerk)
+- `/app/dashboard` - Protected routes requiring Clerk auth
+  - `editor` - Tiptap editor demo
+  - `data` - Database example
+  - `email` - Email demo
+  - `settings` - User settings
 
 ### Key Patterns
-- **Server Actions** in `/actions` for data mutations (customers, Stripe operations)
-- **Database Schema** in `/db/schema` using Drizzle ORM with PostgreSQL
+- **Server Actions** in `/actions` for data mutations with ActionState return type
+- **Database Schema** in `/db/schema` using Drizzle ORM with PostgreSQL (Supabase)
 - **UI Components** in `/components/ui` from Shadcn UI library
 - **Authentication** handled by Clerk middleware with protected route groups
-- **Payments** integrated via Stripe with webhook handling
+- **Email** via Postmark with utilities in `/lib/email.ts`
+- **Rich Text Editor** using Tiptap in `/components/editor`
 
 ### Data Flow
 1. Authentication state managed by Clerk (`@clerk/nextjs`)
-2. Customer data stored in PostgreSQL via Drizzle ORM
-3. Stripe integration for subscription management
-4. Server actions handle all data mutations with proper auth checks
+2. User data optionally extended in PostgreSQL via Drizzle ORM
+3. Server actions return `ActionState<T>` for consistent error handling
+4. Email notifications sent via Postmark
 
 ### Environment Variables Required
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` - Clerk public key
 - `CLERK_SECRET_KEY` - Clerk secret key
-- `STRIPE_SECRET_KEY` - Stripe secret key
-- Database connection handled by Supabase CLI
+- `DATABASE_URL` - PostgreSQL connection string (Supabase)
+- `POSTMARK_API_TOKEN` - Postmark API token (optional)
+- `POSTMARK_FROM_EMAIL` - Verified sender email (optional)

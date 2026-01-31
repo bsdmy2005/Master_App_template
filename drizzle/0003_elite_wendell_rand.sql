@@ -1,1 +1,0 @@
-ALTER TABLE "use_cases" ADD COLUMN "key_acceptance_criteria" text;

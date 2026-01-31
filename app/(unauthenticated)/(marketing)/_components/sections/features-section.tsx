@@ -2,10 +2,10 @@
 
 import { motion } from "framer-motion"
 import {
-  BarChart,
-  Code2,
-  CreditCard,
   Database,
+  Mail,
+  Moon,
+  PenSquare,
   Palette,
   Shield
 } from "lucide-react"
@@ -13,40 +13,40 @@ import { SectionWrapper } from "./section-wrapper"
 
 const features = [
   {
-    name: "Authentication Ready",
+    name: "Clerk Authentication",
     description:
-      "Clerk authentication pre-configured with protected routes, user management, and session handling.",
+      "Secure authentication with social logins, MFA, and user management. Protected routes configured out of the box.",
     icon: Shield
   },
   {
-    name: "Payments Integration",
+    name: "Supabase Database",
     description:
-      "Stripe integration with webhook support, subscription management, and checkout flows.",
-    icon: CreditCard
-  },
-  {
-    name: "Database Setup",
-    description:
-      "PostgreSQL with Drizzle ORM configured and ready. Includes migrations and type-safe queries.",
+      "PostgreSQL with Drizzle ORM configured and ready. Includes example schemas and type-safe queries.",
     icon: Database
   },
   {
-    name: "Modern UI Components",
+    name: "Postmark Email",
+    description:
+      "Transactional email integration with template support for welcome emails, notifications, and more.",
+    icon: Mail
+  },
+  {
+    name: "Tiptap Rich Text Editor",
+    description:
+      "Feature-rich text editor with formatting toolbar, headings, lists, and real-time HTML preview.",
+    icon: PenSquare
+  },
+  {
+    name: "Shadcn UI Components",
     description:
       "Beautiful, accessible components with shadcn/ui. Dark mode support and Tailwind CSS v4.",
     icon: Palette
   },
   {
-    name: "TypeScript First",
+    name: "Dark Mode Built-in",
     description:
-      "Full TypeScript support with strict mode, path aliases, and type safety throughout.",
-    icon: Code2
-  },
-  {
-    name: "Analytics Built-in",
-    description:
-      "PostHog analytics integration for tracking user behavior and product metrics.",
-    icon: BarChart
+      "Theme switching with next-themes. Automatically detects system preference with manual override.",
+    icon: Moon
   }
 ]
 
@@ -59,7 +59,7 @@ export function FeaturesSection() {
         <div className="mx-auto max-w-2xl text-center">
           <motion.h2
             id="features-heading"
-            className="text-primary text-base leading-7 font-semibold"
+            className="text-primary text-base font-semibold leading-7"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
@@ -117,7 +117,7 @@ export function FeaturesSection() {
                   />
                 </motion.div>
 
-                <dt className="text-foreground mt-4 flex items-center gap-x-3 text-base leading-7 font-semibold">
+                <dt className="text-foreground mt-4 flex items-center gap-x-3 text-base font-semibold leading-7">
                   {feature.name}
                   <motion.div
                     className="from-primary/50 h-px flex-1 bg-gradient-to-r to-transparent"

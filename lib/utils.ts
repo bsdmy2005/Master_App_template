@@ -1,28 +1,49 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
+/**
+ * Merge Tailwind CSS classes with clsx
+ * Handles conditional classes and resolves conflicts
+ */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// Helper to parse use case IDs for alphanumeric sorting (e.g., US-1, US-2, US-10)
-export function parseUseCaseId(useCaseId: string): { prefix: string; number: number } {
-  const match = useCaseId.match(/^([A-Za-z-]+)(\d+)$/)
-  if (match) {
-    return { prefix: match[1], number: parseInt(match[2], 10) }
-  }
-  return { prefix: useCaseId, number: 0 }
+/**
+ * Format a date for display
+ */
+export function formatDate(date: Date | string): string {
+  return new Date(date).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  })
 }
 
-// Compare use case IDs alphanumerically (US-1 < US-2 < US-10)
-export function compareUseCaseIds(a: string, b: string): number {
-  const parsedA = parseUseCaseId(a)
-  const parsedB = parseUseCaseId(b)
+/**
+ * Truncate text to a maximum length with ellipsis
+ */
+export function truncate(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text
+  return text.slice(0, maxLength - 3) + "..."
+}
 
-  // First compare prefixes
-  const prefixCompare = parsedA.prefix.localeCompare(parsedB.prefix)
-  if (prefixCompare !== 0) return prefixCompare
+/**
+ * Generate initials from a name
+ */
+export function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2)
+}
 
-  // Then compare numbers
-  return parsedA.number - parsedB.number
+/**
+ * Sleep for a given number of milliseconds
+ * Useful for testing loading states
+ */
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
